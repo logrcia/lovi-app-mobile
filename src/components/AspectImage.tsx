@@ -14,9 +14,10 @@ interface AspectImageProps {
 /**
  * Image frame with a deterministic aspect ratio.
  *
- * `aspectRatio` combined with `width: '100%'` leaves the height undefined at runtime,
- * so the image falls back to its intrinsic height and grows past its card. Measuring
- * the frame and setting a numeric height keeps the ratio exact on every device.
+ * React Native prepends the asset's intrinsic width/height to the image style, so any
+ * dimension the caller does not override is the photo's natural size: a `width: '100%'`
+ * image keeps its native height and the picture renders oversized inside its frame.
+ * This frame measures itself, sets a numeric height, and forces both image dimensions.
  */
 export const AspectImage: React.FC<AspectImageProps> = ({
   source,
@@ -42,7 +43,7 @@ export const AspectImage: React.FC<AspectImageProps> = ({
       {width > 0 ? (
         <Image
           source={source}
-          style={StyleSheet.absoluteFill}
+          style={[StyleSheet.absoluteFill, styles.image]}
           resizeMode="cover"
           accessibilityLabel={accessibilityLabel}
         />
@@ -56,5 +57,13 @@ const styles = StyleSheet.create({
   frame: {
     width: '100%',
     overflow: 'hidden',
+  },
+  /**
+   * Both dimensions must be set: React Native prepends the asset's intrinsic
+   * width/height to the image style, and anything not overridden here wins.
+   */
+  image: {
+    width: '100%',
+    height: '100%',
   },
 });
