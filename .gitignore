@@ -39,3 +39,6 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# web design reference (interactive prototype pasted for the RN port)
+design-reference/
