@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState } from 'react';
-import { Platform, StatusBar, StyleSheet, View } from 'react-native';
+import { StatusBar, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AddPetModal } from './src/components/AddPetModal';
@@ -358,11 +358,7 @@ function AppShell() {
 
   return (
     <View style={styles.root}>
-      <StatusBar
-        barStyle="dark-content"
-        backgroundColor={COLORS.cream}
-        translucent={Platform.OS === 'android'}
-      />
+      <StatusBar barStyle="dark-content" />
 
       <View style={[styles.content, { paddingTop: insets.top }]}>{renderScreen()}</View>
 
