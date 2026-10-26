@@ -3,6 +3,7 @@ import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 
 import type { ViewStyle } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
+import { AspectImage } from '../components/AspectImage';
 import { Sticker } from '../components/Sticker';
 import {
   alpha,
@@ -215,14 +216,18 @@ export const CreateMemoryScreen: React.FC<CreateMemoryScreenProps> = ({
               Vista previa del medio ({mediaType === 'video' ? 'video' : 'fotografía'})
             </Text>
 
-            <View style={styles.previewFrame}>
-              <Image source={selectedPet.avatar} style={styles.previewImage} resizeMode="cover" />
+            <AspectImage
+              source={selectedPet.avatar}
+              ratio={4 / 3}
+              style={styles.previewFrame}
+              accessibilityLabel={`Vista previa de ${selectedPet.name}`}
+            >
               {mediaType === 'video' ? (
                 <View style={styles.videoBadge}>
                   <Text style={styles.videoBadgeText}>Video · {VIDEO_PREVIEW_DURATION}</Text>
                 </View>
               ) : null}
-            </View>
+            </AspectImage>
 
             <Text style={styles.previewCaption}>
               Captura lista desde la galería de {selectedPet.name}
@@ -531,10 +536,6 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.md,
     overflow: 'hidden',
     backgroundColor: alpha(COLORS.ink, 0.05),
-  },
-  previewImage: {
-    width: '100%',
-    aspectRatio: 4 / 3,
   },
   videoBadge: {
     position: 'absolute',

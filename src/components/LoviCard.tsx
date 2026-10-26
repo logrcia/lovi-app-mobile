@@ -4,6 +4,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { alpha, COLORS, INK_WASH, RADIUS, SHADOWS, TEXT } from '../theme';
 import type { LoviMemory, Pet } from '../types';
+import { AspectImage } from './AspectImage';
 import { Sticker } from './Sticker';
 
 interface LoviCardProps {
@@ -102,14 +103,21 @@ export const LoviCard: React.FC<LoviCardProps> = ({ memory, pet, onPetClick, onF
 
       {/* Media */}
       {memory.mediaType === 'image' && memory.mediaUrl ? (
-        <View style={styles.mediaFrame}>
-          <Image source={memory.mediaUrl} style={styles.media} resizeMode="cover" />
-        </View>
+        <AspectImage
+          source={memory.mediaUrl}
+          ratio={4 / 3}
+          style={styles.mediaFrame}
+          accessibilityLabel={memory.title}
+        />
       ) : null}
 
       {memory.mediaType === 'video' && memory.mediaUrl ? (
-        <View style={styles.mediaFrame}>
-          <Image source={memory.mediaUrl} style={styles.media} resizeMode="cover" />
+        <AspectImage
+          source={memory.mediaUrl}
+          ratio={4 / 3}
+          style={styles.mediaFrame}
+          accessibilityLabel={memory.title}
+        >
           <View style={styles.videoOverlay}>
             <View style={styles.playButton}>
               <Ionicons name="play" size={20} color={COLORS.ink} style={styles.playIcon} />
@@ -118,7 +126,7 @@ export const LoviCard: React.FC<LoviCardProps> = ({ memory, pet, onPetClick, onF
           <View style={styles.durationBadge}>
             <Text style={styles.durationText}>Video · {memory.videoDuration || '0:45'}</Text>
           </View>
-        </View>
+        </AspectImage>
       ) : null}
 
       {memory.mediaType === 'audio' ? (
@@ -357,10 +365,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: alpha(COLORS.ink, 0.05),
     marginBottom: 14,
-  },
-  media: {
-    width: '100%',
-    aspectRatio: 4 / 3,
   },
   videoOverlay: {
     position: 'absolute',

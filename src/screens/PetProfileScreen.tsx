@@ -11,6 +11,7 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { AddVaccineModal } from '../components/AddVaccineModal';
+import { AspectImage } from '../components/AspectImage';
 import { CreateAlbumModal } from '../components/CreateAlbumModal';
 import { LoviCard } from '../components/LoviCard';
 import { ManageAlbumMemoriesModal } from '../components/ManageAlbumMemoriesModal';
@@ -405,19 +406,18 @@ export const PetProfileScreen: React.FC<PetProfileScreenProps> = ({
               </View>
 
               <View style={styles.bannerCard}>
-                <View style={styles.bannerCoverWrap}>
-                  <Image
-                    source={activeAlbum.coverUrl}
-                    style={styles.bannerCover}
-                    resizeMode="cover"
-                    accessibilityLabel={activeAlbum.title}
-                  />
+                <AspectImage
+                  source={activeAlbum.coverUrl}
+                  ratio={16 / 9}
+                  style={styles.bannerCoverWrap}
+                  accessibilityLabel={activeAlbum.title}
+                >
                   <View style={styles.bannerSticker}>
                     <Sticker variant="fucsia" textStyle={styles.stickerSmall}>
                       álbum de {pet.name}
                     </Sticker>
                   </View>
-                </View>
+                </AspectImage>
 
                 <View>
                   <View style={styles.bannerTitleRow}>
@@ -512,18 +512,18 @@ export const PetProfileScreen: React.FC<PetProfileScreenProps> = ({
                         accessibilityRole="button"
                         accessibilityLabel={`Abrir álbum ${album.title}`}
                       >
-                        <View style={styles.albumCoverWrap}>
-                          <Image
-                            source={album.coverUrl}
-                            style={styles.albumCover}
-                            resizeMode="cover"
-                          />
+                        <AspectImage
+                          source={album.coverUrl}
+                          ratio={1}
+                          style={styles.albumCoverWrap}
+                          accessibilityLabel={album.title}
+                        >
                           <View style={styles.albumCoverSticker}>
                             <Sticker variant="butter" textStyle={styles.stickerSmall}>
                               Álbum
                             </Sticker>
                           </View>
-                        </View>
+                        </AspectImage>
 
                         <Text style={styles.albumTitle} numberOfLines={1}>
                           {album.title}
@@ -1124,10 +1124,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: alpha(COLORS.ink, 0.05),
   },
-  bannerCover: {
-    width: '100%',
-    aspectRatio: 16 / 9,
-  },
   bannerSticker: {
     position: 'absolute',
     top: 12,
@@ -1254,10 +1250,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginBottom: 8,
     backgroundColor: alpha(COLORS.ink, 0.05),
-  },
-  albumCover: {
-    width: '100%',
-    aspectRatio: 1,
   },
   albumCoverSticker: {
     position: 'absolute',
