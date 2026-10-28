@@ -21,7 +21,14 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-font"
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Lovi usa tus fotos para elegir el retrato de tus mascotas.",
+          "cameraPermission": "Lovi usa la cámara para sacarle una foto a tus mascotas."
+        }
+      ]
     ]
   }
 }

@@ -1,8 +1,8 @@
-import React, { useCallback, useMemo, useState } from 'react';
-import { StatusBar, StyleSheet, View } from 'react-native';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, StatusBar, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { AddPetModal } from './src/components/AddPetModal';
+import { AddPetModal, type NewPetDraft } from './src/components/AddPetModal';
 import { BottomTabBar } from './src/components/BottomTabBar';
 import {
   CURRENT_USER,
@@ -13,8 +13,14 @@ import {
   INITIAL_PETS,
   INITIAL_VACCINES,
 } from './src/data/mockData';
-import { CalendarScreen } from './src/screens/CalendarScreen';
-import { CreateMemoryScreen } from './src/screens/CreateMemoryScreen';
+import { signOut } from './src/lib/auth/actions';
+import { useSession } from './src/lib/auth/useSession';
+import { useLoviData } from './src/lib/hooks/useLoviData';
+import { createMemory, type NewMemoryDraft } from './src/lib/repositories/memories';
+import { createPet } from './src/lib/repositories/pets';
+import { AuthScreen } from './src/screens/AuthScreen';
+import { NoPetsScreen } from './src/screens/NoPetsScreen';
+import { CalendarScreen } from './src/screens/CalendarScreen';import { CreateMemoryScreen } from './src/screens/CreateMemoryScreen';
 import { ExploreScreen } from './src/screens/ExploreScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { PetProfileScreen } from './src/screens/PetProfileScreen';
@@ -62,7 +68,7 @@ function parseDesignDate(input: string): string | null {
   return `${match[3]}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 }
 
-function AppShell() {
+function AppShell({ profileId }: { profileId: string }) {
   const insets = useSafeAreaInsets();
 
   // Data
@@ -81,8 +87,43 @@ function AppShell() {
   const [isOwnerView, setIsOwnerView] = useState(true);
   const [isAddPetModalOpen, setIsAddPetModalOpen] = useState(false);
 
+  // ——— Remote data ——————————————————————————————————————————————
+  // Starts from the fixtures so the first frame already has the editorial layout, then
+  // swaps everything for what Postgres actually holds.
+  const remote = useLoviData(profileId);
+
+  /**
+   * The signed-in profile. `CURRENT_USER` is only the pre-load placeholder for the first
+   * frame; the moment the profile row arrives it is replaced by the real account.
+   */
+  const currentUser = remote.data?.currentUser ?? CURRENT_USER;
+
+  useEffect(() => {
+    if (remote.status !== 'ready' || !remote.data) return;
+
+    const data = remote.data;
+    setPets(data.pets);
+    setMemories(data.memories);
+    setAlbums(data.albums);
+    setVaccines(data.vaccines);
+    setAppointments(data.appointments);
+    setCalendarEvents(data.calendarEvents);
+    setViewedUser(data.currentUser);
+    setSelectedPetId((previous) => {
+      if (data.pets.some((pet) => pet.id === previous)) return previous;
+      // Never default to a pet you do not own: those belong to Explore, not to "mine".
+      return data.pets.find((pet) => pet.isMine)?.id ?? previous;
+    });
+  }, [remote.status, remote.data]);
+
+  useEffect(() => {
+    if (remote.status === 'error') {
+      console.warn('[lovi] No se pudo leer Supabase:', remote.error);
+    }
+  }, [remote.status, remote.error]);
+
   const currentPet = useMemo(
-    () => pets.find((pet) => pet.id === selectedPetId) ?? pets[0],
+    () => pets.find((pet) => pet.id === selectedPetId) ?? pets.find((pet) => pet.isMine),
     [pets, selectedPetId]
   );
 
@@ -96,8 +137,8 @@ function AppShell() {
 
   const openOwnerProfile = useCallback(
     (owner: Pet['owner']) => {
-      if (owner.id === CURRENT_USER.id) {
-        setViewedUser(CURRENT_USER);
+      if (owner.id === currentUser.id) {
+        setViewedUser(currentUser);
       } else {
         setViewedUser({
           id: owner.id,
@@ -112,20 +153,23 @@ function AppShell() {
       setUserProfileReturn(screen === 'userProfile' ? 'home' : screen);
       setScreen('userProfile');
     },
-    [screen]
+    [screen, currentUser]
   );
 
   const openOwnProfile = useCallback(() => {
-    setViewedUser(CURRENT_USER);
+    setViewedUser(currentUser);
     setScreen('userProfile');
-  }, []);
+  }, [currentUser]);
 
-  const handleNavigate = useCallback((tab: MainTab) => {
-    if (tab === 'userProfile') {
-      setViewedUser(CURRENT_USER);
-    }
-    setScreen(tab);
-  }, []);
+  const handleNavigate = useCallback(
+    (tab: MainTab) => {
+      if (tab === 'userProfile') {
+        setViewedUser(currentUser);
+      }
+      setScreen(tab);
+    },
+    [currentUser]
+  );
 
   const openCreateMemory = useCallback(() => {
     setScreen('createMemory');
@@ -146,58 +190,52 @@ function AppShell() {
     );
   }, []);
 
-  const handleSaveMemory = useCallback((draft: Partial<LoviMemory>) => {
-    const memory: LoviMemory = {
-      id: `lovi-${Date.now()}`,
-      petId: draft.petId ?? currentPet.id,
-      title: draft.title?.trim() || 'Recuerdo sin título',
-      description: draft.description,
-      mediaType: draft.mediaType ?? 'text',
-      mediaUrl: draft.mediaUrl,
-      audioDuration: draft.audioDuration,
-      videoDuration: draft.videoDuration,
-      createdAt: 'Recién · Hoy',
-      isRecommendation: false,
-    };
+  const handleSaveMemory = useCallback(
+    async (draft: NewMemoryDraft) => {
+      await createMemory(draft);
 
-    setMemories((prev) => [memory, ...prev]);
-    setCalendarEvents((prev) => [
-      {
-        id: `cal-mem-${Date.now()}`,
-        petId: memory.petId,
-        type: 'recuerdo',
-        title: `Recuerdo: ${memory.title}`,
-        date: DESIGN_TODAY,
-        time: 'Recién',
-        description: memory.description || 'Lovi guardado con cariño',
-      },
-      ...prev,
-    ]);
-
-    setSelectedPetId(memory.petId);
-    setScreen('home');
-  }, [currentPet.id]);
+      setSelectedPetId(draft.petId);
+      setScreen('home');
+      remote.refetch();
+    },
+    [remote.refetch]
+  );
 
   const handleAddPet = useCallback(
-    (draft: Omit<Pet, 'id' | 'followersCount' | 'isMine' | 'owner'>) => {
-      const newPet: Pet = {
-        ...draft,
-        id: `pet-${Date.now()}`,
-        followersCount: 0,
-        isMine: true,
-        owner: {
-          id: CURRENT_USER.id,
-          name: CURRENT_USER.name,
-          handle: CURRENT_USER.handle,
-          avatar: CURRENT_USER.avatar,
-        },
-      };
+    async (draft: NewPetDraft) => {
+      const petId = await createPet({
+        ownerId: currentUser.id,
+        name: draft.name,
+        species: draft.species,
+        birthday: draft.birthday,
+        bio: draft.bio,
+        avatar: draft.avatarLocalUri
+          ? { uri: draft.avatarLocalUri, mimeType: draft.avatarMimeType ?? null }
+          : null,
+      });
 
-      setPets((prev) => [...prev, newPet]);
-      setSelectedPetId(newPet.id);
+      // Optimistic row so the profile reacts instantly; `refetch` reconciles it with the
+      // real Postgres row (including the public avatar URL) a beat later.
+      setPets((prev) => [
+        ...prev,
+        {
+          ...draft,
+          id: petId,
+          followersCount: 0,
+          isMine: true,
+          owner: {
+            id: currentUser.id,
+            name: currentUser.name,
+            handle: currentUser.handle,
+            avatar: currentUser.avatar,
+          },
+        },
+      ]);
+      setSelectedPetId(petId);
       setScreen('petProfile');
+      remote.refetch();
     },
-    []
+    [currentUser, remote.refetch]
   );
 
   const handleSaveAppointment = useCallback((draft: Omit<Appointment, 'id' | 'isUpcoming'>) => {
@@ -271,19 +309,34 @@ function AppShell() {
   );
 
   // ——— Screens ——————————————————————————————————————————————————
+  const renderHome = () => (
+    <HomeScreen
+      pets={pets}
+      memories={memories}
+      currentUserName={remote.data?.currentUser.name}
+      currentUserAvatar={remote.data?.currentUser.avatar}
+      onSelectPet={openPetProfile}
+      onFollowToggle={handleFollowToggle}
+      onOpenCreate={openCreateMemory}
+      onOpenUserProfile={openOwnProfile}
+    />
+  );
+
   const renderScreen = () => {
+    // A brand-new account has no pets yet: those screens have nothing to show and would
+    // dereference an undefined pet. Fall back to the feed, which has its own empty state.
+    if (screen === 'petProfile' && !currentPet) {
+      return <NoPetsScreen onGoToProfile={openOwnProfile} />;
+    }
+
+    // Calendar and the composer are always about a pet you own, never one from Explore.
+    if ((screen === 'calendar' || screen === 'createMemory') && !currentPet?.isMine) {
+      return <NoPetsScreen onGoToProfile={openOwnProfile} />;
+    }
+
     switch (screen) {
       case 'home':
-        return (
-          <HomeScreen
-            pets={pets}
-            memories={memories}
-            onSelectPet={openPetProfile}
-            onFollowToggle={handleFollowToggle}
-            onOpenCreate={openCreateMemory}
-            onOpenUserProfile={openOwnProfile}
-          />
-        );
+        return renderHome();
 
       case 'explore':
         return (
@@ -297,7 +350,7 @@ function AppShell() {
       case 'petProfile':
         return (
           <PetProfileScreen
-            pet={currentPet}
+            pet={currentPet!}
             memories={memories}
             albums={albums}
             vaccines={vaccines}
@@ -319,8 +372,8 @@ function AppShell() {
       case 'calendar':
         return (
           <CalendarScreen
-            pet={currentPet}
-            events={calendarEvents.filter((event) => event.petId === currentPet.id)}
+            pet={currentPet!}
+            events={calendarEvents.filter((event) => event.petId === currentPet?.id)}
           />
         );
 
@@ -329,12 +382,16 @@ function AppShell() {
           <UserProfileScreen
             user={viewedUser}
             pets={pets}
+            currentUserId={profileId}
+            onSignOut={() => {
+              void signOut();
+            }}
             onSelectPet={openPetProfile}
             onOpenCreate={openCreateMemory}
             onOpenAddPet={() => setIsAddPetModalOpen(true)}
             onFollowToggle={handleFollowToggle}
             onBack={
-              viewedUser.id === CURRENT_USER.id
+              viewedUser.id === currentUser.id
                 ? undefined
                 : () => setScreen(userProfileReturn)
             }
@@ -344,7 +401,7 @@ function AppShell() {
       case 'createMemory':
         return (
           <CreateMemoryScreen
-            pet={currentPet}
+            pet={currentPet!}
             availablePets={myPets}
             onSave={handleSaveMemory}
             onCancel={() => setScreen('home')}
@@ -371,19 +428,33 @@ function AppShell() {
       <AddPetModal
         isOpen={isAddPetModalOpen}
         onClose={() => setIsAddPetModalOpen(false)}
-        onSavePet={(pet) => {
-          setIsAddPetModalOpen(false);
-          handleAddPet(pet);
-        }}
+        onSavePet={handleAddPet}
       />
     </View>
   );
 }
 
+/** Decides whether the login screen or the app shell is mounted. */
+function Root() {
+  const auth = useSession();
+
+  if (auth.status === 'loading') {
+    return (
+      <View style={styles.boot}>
+        <ActivityIndicator color={COLORS.ink} />
+      </View>
+    );
+  }
+
+  if (!auth.session) return <AuthScreen />;
+
+  return <AppShell profileId={auth.session.user.id} />;
+}
+
 export default function App() {
   return (
     <SafeAreaProvider>
-      <AppShell />
+      <Root />
     </SafeAreaProvider>
   );
 }
@@ -395,5 +466,11 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  boot: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.cream,
   },
 });

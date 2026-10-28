@@ -14,11 +14,14 @@ import {
   SHADOWS,
   TEXT,
 } from '../theme';
-import type { LoviMemory, Pet } from '../types';
+import type { LoviImage, LoviMemory, Pet } from '../types';
 
 interface HomeScreenProps {
   pets: Pet[];
   memories: LoviMemory[];
+  /** Fallback identity for the greeting when the account has no pet yet. */
+  currentUserName?: string;
+  currentUserAvatar?: LoviImage;
   onSelectPet: (petId: string) => void;
   onFollowToggle: (petId: string) => void;
   onOpenCreate: () => void;
@@ -32,6 +35,8 @@ interface HomeScreenProps {
 export const HomeScreen: React.FC<HomeScreenProps> = ({
   pets,
   memories,
+  currentUserName,
+  currentUserAvatar,
   onSelectPet,
   onFollowToggle,
   onOpenCreate,
@@ -40,8 +45,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   const myPets = pets.filter((pet) => pet.isMine);
 
   const owner = myPets[0]?.owner;
-  const ownerFirstName = owner?.name.split(' ')[0] ?? 'Abril';
-  const ownerAvatar = owner?.avatar;
+  const ownerFirstName = owner?.name.split(' ')[0] ?? currentUserName?.split(' ')[0] ?? 'Abril';
+  const ownerAvatar = owner?.avatar ?? currentUserAvatar;
 
   if (memories.length === 0) {
     return (

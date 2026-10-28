@@ -1,10 +1,22 @@
 import React, { useEffect, useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import type { ViewStyle } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import * as ImagePicker from 'expo-image-picker';
 
 import { AspectImage } from '../components/AspectImage';
 import { Sticker } from '../components/Sticker';
+import type { NewMemoryDraft } from '../lib/repositories/memories';
 import {
   alpha,
   COLORS,
@@ -16,28 +28,38 @@ import {
   SHADOWS,
   TEXT,
 } from '../theme';
-import type { LoviMemory, MediaType, Pet } from '../types';
+import type { MediaType, Pet } from '../types';
 
 interface CreateMemoryScreenProps {
   pet: Pet;
   availablePets: Pet[];
-  onSave: (memory: Partial<LoviMemory>) => void;
+  onSave: (memory: NewMemoryDraft) => Promise<void>;
   onCancel: () => void;
 }
 
 type IoniconName = React.ComponentProps<typeof Ionicons>['name'];
 
-const MEDIA_OPTIONS: { type: MediaType; label: string; icon: IoniconName }[] = [
-  { type: 'image', label: 'Foto', icon: 'camera' },
-  { type: 'video', label: 'Video', icon: 'videocam' },
-  { type: 'audio', label: 'Audio', icon: 'mic' },
-  { type: 'text', label: 'Solo texto', icon: 'book' },
+interface MediaOption {
+  type: MediaType;
+  label: string;
+  icon: IoniconName;
+  /** Video and audio need real capture — until then they are visibly unavailable. */
+  available: boolean;
+}
+
+const MEDIA_OPTIONS: readonly MediaOption[] = [
+  { type: 'image', label: 'Foto', icon: 'camera', available: true },
+  { type: 'video', label: 'Video', icon: 'videocam', available: false },
+  { type: 'audio', label: 'Audio', icon: 'mic', available: false },
+  { type: 'text', label: 'Solo texto', icon: 'book', available: true },
 ];
 
-const AUDIO_PREVIEW_TITLE = 'Nota de voz lista: "Ronquiditos de siesta"';
-const AUDIO_PREVIEW_DURATION = '0:35';
-const VIDEO_PREVIEW_DURATION = '0:50';
 const FALLBACK_TITLE = 'Recuerdo sin título';
+
+interface PickedMedia {
+  uri: string;
+  mimeType: string | null;
+}
 
 /** The reference's `shadow-xs`, tuned for the parchment inputs. */
 const INPUT_SHADOW: ViewStyle = {
@@ -63,6 +85,8 @@ export const CreateMemoryScreen: React.FC<CreateMemoryScreenProps> = ({
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [mediaType, setMediaType] = useState<MediaType>('image');
+  const [media, setMedia] = useState<PickedMedia | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     setSelectedPetId(pet.id);
@@ -71,21 +95,68 @@ export const CreateMemoryScreen: React.FC<CreateMemoryScreenProps> = ({
   const pets = availablePets.length > 0 ? availablePets : [pet];
   const selectedPet = pets.find((candidate) => candidate.id === selectedPetId) ?? pet;
   const trimmedTitle = title.trim();
-  const canSave = trimmedTitle.length > 0;
-  const showsImagePreview = mediaType === 'image' || mediaType === 'video';
+  const canSave = trimmedTitle.length > 0 && !saving;
 
-  const handleSave = () => {
-    onSave({
-      petId: selectedPet.id,
-      title: trimmedTitle || FALLBACK_TITLE,
-      description: description.trim() || undefined,
-      mediaType,
-      mediaUrl: showsImagePreview ? selectedPet.avatar : undefined,
-      audioDuration: mediaType === 'audio' ? AUDIO_PREVIEW_DURATION : undefined,
-      videoDuration: mediaType === 'video' ? VIDEO_PREVIEW_DURATION : undefined,
-      createdAt: 'Recién · Hoy',
-      isRecommendation: false,
+  const pickFromLibrary = async () => {
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permiso de fotos', 'Necesitamos permiso para acceder a tus fotos.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      quality: 0.8,
     });
+
+    if (result.canceled) return;
+    const asset = result.assets[0];
+    if (asset) setMedia({ uri: asset.uri, mimeType: asset.mimeType ?? null });
+  };
+
+  const pickFromCamera = async () => {
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      Alert.alert('Permiso de cámara', 'Necesitamos permiso para usar la cámara.');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images'],
+      quality: 0.8,
+    });
+
+    if (result.canceled) return;
+    const asset = result.assets[0];
+    if (asset) setMedia({ uri: asset.uri, mimeType: asset.mimeType ?? null });
+  };
+
+  const handleSave = async () => {
+    if (saving) return;
+
+    if (mediaType === 'image' && !media) {
+      Alert.alert('Falta la foto', 'Elegí una foto para este recuerdo, o cambiá a «Solo texto».');
+      return;
+    }
+
+    setSaving(true);
+    try {
+      await onSave({
+        petId: selectedPet.id,
+        title: trimmedTitle || FALLBACK_TITLE,
+        description: description.trim() || undefined,
+        mediaType,
+        mediaLocalUri: media?.uri,
+        mediaMimeType: media?.mimeType ?? null,
+      });
+    } catch (unknownError) {
+      Alert.alert(
+        'No pudimos guardar el recuerdo',
+        unknownError instanceof Error ? unknownError.message : 'Probá de nuevo.'
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -173,21 +244,25 @@ export const CreateMemoryScreen: React.FC<CreateMemoryScreenProps> = ({
         <View>
           <Text style={styles.label}>Formato del recuerdo</Text>
           <View style={styles.mediaRow}>
-            {MEDIA_OPTIONS.map(({ type, label, icon }) => {
+            {MEDIA_OPTIONS.map(({ type, label, icon, available }) => {
               const isSelected = mediaType === type;
 
               return (
                 <Pressable
                   key={type}
                   onPress={() => setMediaType(type)}
+                  disabled={!available}
                   style={({ pressed }) => [
                     styles.mediaChip,
                     isSelected ? styles.mediaChipSelected : styles.mediaChipIdle,
+                    !available && styles.mediaChipDisabled,
                     pressed && styles.pressed,
                   ]}
                   accessibilityRole="button"
-                  accessibilityState={{ selected: isSelected }}
-                  accessibilityLabel={`Formato ${label}`}
+                  accessibilityState={{ selected: isSelected, disabled: !available }}
+                  accessibilityLabel={
+                    available ? `Formato ${label}` : `Formato ${label}, todavía no disponible`
+                  }
                 >
                   <Ionicons
                     name={icon}
@@ -207,45 +282,77 @@ export const CreateMemoryScreen: React.FC<CreateMemoryScreenProps> = ({
               );
             })}
           </View>
+
+          <Text style={styles.mediaHint}>Video y audio llegan más adelante.</Text>
         </View>
 
-        {/* Medium preview: photo or video */}
-        {showsImagePreview ? (
+        {/* Medium: the real photo that will be uploaded */}
+        {mediaType === 'image' ? (
           <View style={styles.mediaCard}>
-            <Text style={styles.mediaCardLabel}>
-              Vista previa del medio ({mediaType === 'video' ? 'video' : 'fotografía'})
-            </Text>
+            <Text style={styles.mediaCardLabel}>Foto del recuerdo</Text>
 
-            <AspectImage
-              source={selectedPet.avatar}
-              ratio={4 / 3}
-              style={styles.previewFrame}
-              accessibilityLabel={`Vista previa de ${selectedPet.name}`}
-            >
-              {mediaType === 'video' ? (
-                <View style={styles.videoBadge}>
-                  <Text style={styles.videoBadgeText}>Video · {VIDEO_PREVIEW_DURATION}</Text>
+            {media ? (
+              <>
+                <AspectImage
+                  source={{ uri: media.uri }}
+                  ratio={4 / 3}
+                  style={styles.previewFrame}
+                  accessibilityLabel="Foto elegida para el recuerdo"
+                />
+
+                <View style={styles.mediaActions}>
+                  <Text style={styles.previewCaption}>Se sube al guardar el recuerdo.</Text>
+                  <Pressable
+                    onPress={() => void pickFromLibrary()}
+                    accessibilityRole="button"
+                    accessibilityLabel="Cambiar foto"
+                  >
+                    <Text style={styles.linkLabel}>Cambiar</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setMedia(null)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Quitar foto"
+                  >
+                    <Text style={styles.linkMuted}>Quitar</Text>
+                  </Pressable>
                 </View>
-              ) : null}
-            </AspectImage>
+              </>
+            ) : (
+              <Pressable
+                onPress={() => void pickFromLibrary()}
+                style={({ pressed }) => [styles.photoDrop, pressed && styles.pressed]}
+                accessibilityRole="button"
+                accessibilityLabel="Elegir una foto para el recuerdo"
+              >
+                <View style={styles.photoDropIcon}>
+                  <Ionicons name="camera-outline" size={20} color={COLORS.fucsia} />
+                </View>
+                <Text style={styles.photoDropTitle}>Elegir una foto</Text>
+                <Text style={styles.photoDropHint}>Desde la galería de tu celular</Text>
+              </Pressable>
+            )}
 
-            <Text style={styles.previewCaption}>
-              Captura lista desde la galería de {selectedPet.name}
-            </Text>
-          </View>
-        ) : null}
+            <View style={styles.sourceRow}>
+              <Pressable
+                onPress={() => void pickFromLibrary()}
+                style={({ pressed }) => [styles.sourceButton, pressed && styles.pressed]}
+                accessibilityRole="button"
+                accessibilityLabel="Elegir de la galería"
+              >
+                <Ionicons name="images-outline" size={13} color={COLORS.ink} />
+                <Text style={styles.sourceLabel}>Galería</Text>
+              </Pressable>
 
-        {/* Medium preview: voice note */}
-        {mediaType === 'audio' ? (
-          <View style={styles.audioCard}>
-            <View style={styles.audioIcon}>
-              <Ionicons name="mic" size={24} color={COLORS.butter} />
-            </View>
-            <View style={styles.audioCopy}>
-              <Text style={styles.audioTitle}>{AUDIO_PREVIEW_TITLE}</Text>
-              <Text style={styles.audioMeta}>
-                {AUDIO_PREVIEW_DURATION} seg · Grabada para {selectedPet.name}
-              </Text>
+              <Pressable
+                onPress={() => void pickFromCamera()}
+                style={({ pressed }) => [styles.sourceButton, pressed && styles.pressed]}
+                accessibilityRole="button"
+                accessibilityLabel="Sacar una foto"
+              >
+                <Ionicons name="camera-outline" size={13} color={COLORS.ink} />
+                <Text style={styles.sourceLabel}>Cámara</Text>
+              </Pressable>
             </View>
           </View>
         ) : null}
@@ -308,10 +415,16 @@ export const CreateMemoryScreen: React.FC<CreateMemoryScreenProps> = ({
             accessibilityRole="button"
             accessibilityLabel={`Guardar recuerdo para ${selectedPet.name}`}
           >
-            <Ionicons name="checkmark" size={16} color={COLORS.ink} />
-            <Text style={styles.ctaLabel} numberOfLines={1}>
-              Guardar recuerdo para {selectedPet.name}
-            </Text>
+            {saving ? (
+              <ActivityIndicator color={COLORS.ink} />
+            ) : (
+              <>
+                <Ionicons name="checkmark" size={16} color={COLORS.ink} />
+                <Text style={styles.ctaLabel} numberOfLines={1}>
+                  Guardar recuerdo para {selectedPet.name}
+                </Text>
+              </>
+            )}
           </Pressable>
         </View>
       </View>
@@ -501,6 +614,9 @@ const styles = StyleSheet.create({
     transform: [{ scale: 1.02 }],
     ...SHADOWS.soft,
   },
+  mediaChipDisabled: {
+    opacity: 0.35,
+  },
   mediaChipLabel: {
     fontFamily: FONTS.sans,
     fontSize: 10,
@@ -513,6 +629,84 @@ const styles = StyleSheet.create({
   },
   mediaChipLabelIdle: {
     color: INK_WASH.medium,
+  },
+  mediaHint: {
+    marginTop: 6,
+    fontFamily: FONTS.sans,
+    fontSize: 10,
+    lineHeight: 14,
+    color: INK_WASH.faint,
+  },
+  mediaActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  linkLabel: {
+    fontFamily: FONTS.sans,
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.fucsia,
+  },
+  linkMuted: {
+    fontFamily: FONTS.sans,
+    fontSize: 11,
+    fontWeight: '600',
+    color: INK_WASH.medium,
+  },
+  photoDrop: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+    paddingVertical: 26,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: alpha(COLORS.fucsia, 0.35),
+    backgroundColor: alpha(COLORS.fucsia, 0.04),
+  },
+  photoDropIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: RADIUS.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: alpha(COLORS.fucsia, 0.1),
+    marginBottom: 4,
+  },
+  photoDropTitle: {
+    fontFamily: FONTS.sans,
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.ink,
+  },
+  photoDropHint: {
+    fontFamily: FONTS.sans,
+    fontSize: 10,
+    color: INK_WASH.faint,
+  },
+  sourceRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 6,
+    marginTop: 2,
+  },
+  sourceButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: RADIUS.pill,
+    backgroundColor: COLORS.cream,
+  },
+  sourceLabel: {
+    fontFamily: FONTS.sans,
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.ink,
   },
 
   /* Image / video preview */

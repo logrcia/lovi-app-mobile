@@ -12,20 +12,21 @@ import {
   RADIUS,
   SCREEN_PADDING,
   SHADOWS,
+  TEXT,
 } from '../theme';
 import type { Pet, UserProfile } from '../types';
 
 interface UserProfileScreenProps {
   user: UserProfile;
   pets: Pet[];
+  currentUserId: string;
   onSelectPet: (petId: string) => void;
   onOpenCreate: () => void;
   onOpenAddPet: () => void;
   onFollowToggle: (petId: string) => void;
+  onSignOut: () => void;
   onBack?: () => void;
 }
-
-const CURRENT_USER_ID = 'user-abril';
 
 interface PreferenceRow {
   id: string;
@@ -70,12 +71,14 @@ const PREFERENCES: PreferenceRow[] = [
 export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
   user,
   pets,
+  currentUserId,
   onSelectPet,
   onOpenAddPet,
   onFollowToggle,
+  onSignOut,
   onBack,
 }) => {
-  const isMe = user.id === CURRENT_USER_ID;
+  const isMe = user.id === currentUserId;
   const displayPets = pets.filter((pet) =>
     isMe ? pet.isMine : pet.owner.id === user.id || pet.owner.name === user.name
   );
@@ -143,6 +146,19 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
         </View>
 
         <View style={styles.petList}>
+          {displayPets.length === 0 ? (
+            <View style={styles.emptyPets}>
+              <Text style={styles.emptyPetsTitle}>
+                {isMe ? 'Todavía no sumaste ninguna' : 'Sin mascotas todavía'}
+              </Text>
+              <Text style={styles.emptyPetsCopy}>
+                {isMe
+                  ? 'Usá «Nueva mascota» para arrancar su diario, su calendario y sus recuerdos.'
+                  : `${user.name.split(' ')[0]} todavía no sumó mascotas a Lovi.`}
+              </Text>
+            </View>
+          ) : null}
+
           {displayPets.map((pet) => (
             <Pressable
               key={pet.id}
@@ -246,6 +262,16 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
               </Pressable>
             ))}
           </View>
+
+          <Pressable
+            onPress={onSignOut}
+            style={({ pressed }) => [styles.signOutButton, pressed && styles.accountRowPressed]}
+            accessibilityRole="button"
+            accessibilityLabel="Cerrar sesión"
+          >
+            <Ionicons name="log-out-outline" size={15} color={COLORS.fucsia} />
+            <Text style={styles.signOutLabel}>Cerrar sesión</Text>
+          </Pressable>
 
           <Text style={styles.footer}>Lovi · {user.joinedDate}</Text>
         </View>
@@ -545,6 +571,39 @@ const styles = StyleSheet.create({
   accountCard: {
     ...CARD_SURFACE,
     overflow: 'hidden',
+  },
+  emptyPets: {
+    ...CARD_SURFACE,
+    borderRadius: RADIUS.xl,
+    paddingVertical: 22,
+    paddingHorizontal: 18,
+    alignItems: 'center',
+    gap: 6,
+  },
+  emptyPetsTitle: {
+    ...TEXT.title,
+    textAlign: 'center',
+  },
+  emptyPetsCopy: {
+    ...TEXT.body,
+    textAlign: 'center',
+  },
+  signOutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: RADIUS.pill,
+    borderWidth: 1,
+    borderColor: alpha(COLORS.fucsia, 0.3),
+    backgroundColor: alpha(COLORS.fucsia, 0.06),
+  },
+  signOutLabel: {
+    fontFamily: FONTS.sans,
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.fucsia,
   },
   accountRow: {
     flexDirection: 'row',

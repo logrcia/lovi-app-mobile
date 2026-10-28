@@ -1,36 +1,39 @@
 import React from 'react';
-import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Image,
+  Pressable,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
+import * as ImagePicker from 'expo-image-picker';
 
-import cocoPark from '../../assets/images/coco_park_run_1792712089196.jpg';
-import lunaNap from '../../assets/images/luna_cat_nap_1792712089280.jpg';
-import miloPortrait from '../../assets/images/milo_dog_portrait_1792712088048.jpg';
-import oliverWindow from '../../assets/images/oliver_cat_window_1792712089510.jpg';
-
+import { parseAgeToBirthday } from '../lib/pets/age';
 import { alpha, COLORS, FONTS, INK_WASH, RADIUS, SHADOWS } from '../theme';
-import type { LoviImage, Pet } from '../types';
+import type { Pet } from '../types';
 import { AppModal } from './AppModal';
+
+/** What the sheet hands over: the display pet plus the local file to upload. */
+export interface NewPetDraft extends Omit<Pet, 'id' | 'followersCount' | 'isMine' | 'owner'> {
+  /** `YYYY-MM-DD`, already parsed from the age text by the sheet. */
+  birthday: string;
+  /** Local `file://` uri chosen with the picker; uploaded once the row exists. */
+  avatarLocalUri?: string;
+  avatarMimeType?: string | null;
+}
 
 interface AddPetModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSavePet: (pet: Omit<Pet, 'id' | 'followersCount' | 'isMine' | 'owner'>) => void;
+  onSavePet: (pet: NewPetDraft) => Promise<void>;
 }
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
 
 const SPECIES: ReadonlyArray<Pet['species']> = ['perro', 'gato', 'conejo', 'ave', 'otro'];
-
-/** The bundled photos double as the avatar gallery — no remote URLs, no string sources. */
-const PRESET_AVATARS: ReadonlyArray<{ photo: LoviImage; label: string }> = [
-  { photo: miloPortrait, label: 'Golden / Perro' },
-  { photo: cocoPark, label: 'Cachorro / Parque' },
-  { photo: lunaNap, label: 'Gato siesta' },
-  { photo: oliverWindow, label: 'Gato ventana' },
-];
-
-/** Pre-selects a bundled photo that matches the chosen species. */
-const defaultAvatarIndex = (species: Pet['species']): number => (species === 'gato' ? 2 : 0);
 
 interface FieldProps {
   label: string;
@@ -89,16 +92,23 @@ const Field: React.FC<FieldProps> = ({
   );
 };
 
+interface PickedPhoto {
+  uri: string;
+  mimeType: string | null;
+}
+
 /**
- * "Agregar nueva mascota" — name, species, age, personality and a bundled avatar gallery.
- * Every field resets when the sheet reopens.
+ * "Agregar nueva mascota" — name, species, age, personality and a photo taken from the
+ * device. The photo is uploaded after the row exists; the sheet stays open and reports the
+ * error if that fails, so nothing is ever saved half-way.
  */
 export const AddPetModal: React.FC<AddPetModalProps> = ({ isOpen, onClose, onSavePet }) => {
   const [name, setName] = React.useState('');
   const [species, setSpecies] = React.useState<Pet['species']>('perro');
   const [age, setAge] = React.useState('');
   const [bio, setBio] = React.useState('');
-  const [avatarIndex, setAvatarIndex] = React.useState(0);
+  const [photo, setPhoto] = React.useState<PickedPhoto | null>(null);
+  const [saving, setSaving] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
   React.useEffect(() => {
@@ -108,39 +118,101 @@ export const AddPetModal: React.FC<AddPetModalProps> = ({ isOpen, onClose, onSav
     setSpecies('perro');
     setAge('');
     setBio('');
-    setAvatarIndex(defaultAvatarIndex('perro'));
+    setPhoto(null);
+    setSaving(false);
     setErrorMessage(null);
   }, [isOpen]);
 
-  const canSave = name.trim().length > 0;
+  const canSave = name.trim().length > 0 && !saving;
 
-  const selectSpecies = (next: Pet['species']) => {
-    setSpecies(next);
-    setAvatarIndex(defaultAvatarIndex(next));
+  const acceptAsset = (asset: ImagePicker.ImagePickerAsset | undefined) => {
+    if (!asset) return;
+    setPhoto({ uri: asset.uri, mimeType: asset.mimeType ?? null });
   };
 
-  const handleSubmit = () => {
+  const pickFromLibrary = async () => {
+    setErrorMessage(null);
+
+    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permission.granted) {
+      setErrorMessage('Necesitamos permiso para acceder a tus fotos.');
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (result.canceled) return;
+    acceptAsset(result.assets[0]);
+  };
+
+  const pickFromCamera = async () => {
+    setErrorMessage(null);
+
+    const permission = await ImagePicker.requestCameraPermissionsAsync();
+    if (!permission.granted) {
+      setErrorMessage('Necesitamos permiso para usar la cámara.');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    if (result.canceled) return;
+    acceptAsset(result.assets[0]);
+  };
+
+  const handleSubmit = async () => {
+    if (saving) return;
+
+    setErrorMessage(null);
+
     if (!name.trim()) {
       setErrorMessage('El nombre de la mascota es obligatorio.');
       return;
     }
 
-    if (!age.trim()) {
-      setErrorMessage('La edad de la mascota es obligatoria (ej: "2 meses", "3 años").');
+    const birthday = parseAgeToBirthday(age);
+    if (!birthday) {
+      setErrorMessage('No entendimos la edad. Probá con "4 meses" o "3 años".');
       return;
     }
 
-    const avatar = PRESET_AVATARS[avatarIndex]?.photo ?? PRESET_AVATARS[0].photo;
+    if (!photo) {
+      setErrorMessage('Elegí una foto para la mascota.');
+      return;
+    }
 
-    onSavePet({
-      name: name.trim(),
-      species,
-      age: age.trim(),
-      bio: bio.trim() || 'Compañero/a inseparable de cuatro patas en Lovi.',
-      avatar,
-    });
-
-    onClose();
+    setSaving(true);
+    try {
+      await onSavePet({
+        name: name.trim(),
+        species,
+        age: age.trim(),
+        birthday,
+        bio: bio.trim() || 'Compañero/a inseparable de cuatro patas en Lovi.',
+        avatar: { uri: photo.uri },
+        avatarLocalUri: photo.uri,
+        avatarMimeType: photo.mimeType,
+      });
+      onClose();
+    } catch (unknownError) {
+      setErrorMessage(
+        unknownError instanceof Error
+          ? unknownError.message
+          : 'No pudimos guardar la mascota. Probá de nuevo.'
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -154,7 +226,8 @@ export const AddPetModal: React.FC<AddPetModalProps> = ({ isOpen, onClose, onSav
       footer={
         <>
           <Pressable
-            onPress={handleSubmit}
+            onPress={() => void handleSubmit()}
+            disabled={!canSave}
             style={({ pressed }) => [
               styles.primary,
               !canSave && styles.primaryDisabled,
@@ -163,7 +236,11 @@ export const AddPetModal: React.FC<AddPetModalProps> = ({ isOpen, onClose, onSav
             accessibilityRole="button"
             accessibilityLabel="Guardar mascota"
           >
-            <Text style={styles.primaryLabel}>Guardar mascota</Text>
+            {saving ? (
+              <ActivityIndicator color={COLORS.parchment} />
+            ) : (
+              <Text style={styles.primaryLabel}>Guardar mascota</Text>
+            )}
           </Pressable>
 
           <Pressable
@@ -205,7 +282,7 @@ export const AddPetModal: React.FC<AddPetModalProps> = ({ isOpen, onClose, onSav
             return (
               <Pressable
                 key={option}
-                onPress={() => selectSpecies(option)}
+                onPress={() => setSpecies(option)}
                 style={({ pressed }) => [
                   styles.chip,
                   active && styles.chipActive,
@@ -243,40 +320,72 @@ export const AddPetModal: React.FC<AddPetModalProps> = ({ isOpen, onClose, onSav
       />
 
       <View style={styles.field}>
-        <Text style={styles.label}>Foto de perfil</Text>
+        <Text style={styles.label}>Foto de perfil *</Text>
 
-        <View style={styles.avatarRow}>
-          {PRESET_AVATARS.map((item, index) => {
-            const selected = index === avatarIndex;
+        {photo ? (
+          <View style={styles.photoRow}>
+            <View style={styles.photoPreviewWrap}>
+              <Image source={{ uri: photo.uri }} style={styles.photoPreview} resizeMode="cover" />
+            </View>
 
-            return (
-              <Pressable
-                key={item.label}
-                onPress={() => setAvatarIndex(index)}
-                style={({ pressed }) => [
-                  styles.avatarCell,
-                  selected && styles.avatarCellSelected,
-                  pressed && styles.pressed,
-                ]}
-                accessibilityRole="button"
-                accessibilityState={{ selected }}
-                accessibilityLabel={item.label}
-              >
-                <Image source={item.photo} style={styles.avatarImage} resizeMode="cover" />
+            <View style={styles.photoActions}>
+              <Text style={styles.photoTitle}>Tu foto</Text>
+              <Text style={styles.caption}>Se sube al guardar la mascota.</Text>
 
-                {selected ? (
-                  <View style={styles.avatarOverlay}>
-                    <View style={styles.avatarCheck}>
-                      <Ionicons name="checkmark" size={12} color={COLORS.parchment} />
-                    </View>
-                  </View>
-                ) : null}
-              </Pressable>
-            );
-          })}
+              <View style={styles.photoLinks}>
+                <Pressable
+                  onPress={() => void pickFromLibrary()}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cambiar foto"
+                >
+                  <Text style={styles.linkLabel}>Cambiar</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => setPhoto(null)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Quitar foto"
+                >
+                  <Text style={styles.linkMuted}>Quitar</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        ) : (
+          <Pressable
+            onPress={() => void pickFromLibrary()}
+            style={({ pressed }) => [styles.photoDrop, pressed && styles.pressed]}
+            accessibilityRole="button"
+            accessibilityLabel="Subir una foto de la mascota"
+          >
+            <View style={styles.photoDropIcon}>
+              <Ionicons name="camera-outline" size={20} color={COLORS.fucsia} />
+            </View>
+            <Text style={styles.photoDropTitle}>Subir una foto</Text>
+            <Text style={styles.photoDropHint}>Desde la galería de tu celular</Text>
+          </Pressable>
+        )}
+
+        <View style={styles.sourceRow}>
+          <Pressable
+            onPress={() => void pickFromLibrary()}
+            style={({ pressed }) => [styles.sourceButton, pressed && styles.pressed]}
+            accessibilityRole="button"
+            accessibilityLabel="Elegir de la galería"
+          >
+            <Ionicons name="images-outline" size={13} color={COLORS.ink} />
+            <Text style={styles.sourceLabel}>Galería</Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => void pickFromCamera()}
+            style={({ pressed }) => [styles.sourceButton, pressed && styles.pressed]}
+            accessibilityRole="button"
+            accessibilityLabel="Sacar una foto"
+          >
+            <Ionicons name="camera-outline" size={13} color={COLORS.ink} />
+            <Text style={styles.sourceLabel}>Cámara</Text>
+          </Pressable>
         </View>
-
-        <Text style={styles.caption}>{PRESET_AVATARS[avatarIndex]?.label}</Text>
       </View>
     </AppModal>
   );
@@ -361,46 +470,104 @@ const styles = StyleSheet.create({
     color: COLORS.parchment,
   },
 
-  /* Avatar gallery */
-  avatarRow: {
-    flexDirection: 'row',
-    gap: 8,
+  /* Photo */
+  photoDrop: {
     marginTop: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 2,
+    paddingVertical: 18,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: alpha(COLORS.fucsia, 0.35),
+    backgroundColor: alpha(COLORS.fucsia, 0.04),
   },
-  avatarCell: {
-    flex: 1,
-    aspectRatio: 1,
+  photoDropIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: RADIUS.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: alpha(COLORS.fucsia, 0.1),
+    marginBottom: 4,
+  },
+  photoDropTitle: {
+    fontFamily: FONTS.sans,
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.ink,
+  },
+  photoDropHint: {
+    fontFamily: FONTS.sans,
+    fontSize: 10,
+    color: INK_WASH.faint,
+  },
+  photoRow: {
+    marginTop: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  photoPreviewWrap: {
+    width: 76,
+    height: 76,
     borderRadius: RADIUS.md,
     overflow: 'hidden',
-    backgroundColor: COLORS.cream,
     borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  avatarCellSelected: {
     borderColor: COLORS.fucsia,
-    transform: [{ scale: 1.03 }],
+    backgroundColor: COLORS.cream,
   },
-  avatarImage: {
+  photoPreview: {
     width: '100%',
     height: '100%',
   },
-  avatarOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: alpha(COLORS.fucsia, 0.2),
-    alignItems: 'center',
-    justifyContent: 'center',
+  photoActions: {
+    flex: 1,
+    gap: 2,
   },
-  avatarCheck: {
-    width: 20,
-    height: 20,
-    borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.fucsia,
+  photoTitle: {
+    fontFamily: FONTS.sans,
+    fontSize: 12,
+    fontWeight: '700',
+    color: COLORS.ink,
+  },
+  photoLinks: {
+    flexDirection: 'row',
+    gap: 14,
+    marginTop: 2,
+  },
+  linkLabel: {
+    fontFamily: FONTS.sans,
+    fontSize: 11,
+    fontWeight: '700',
+    color: COLORS.fucsia,
+  },
+  linkMuted: {
+    fontFamily: FONTS.sans,
+    fontSize: 11,
+    fontWeight: '600',
+    color: INK_WASH.medium,
+  },
+  sourceRow: {
+    flexDirection: 'row',
+    gap: 6,
+    marginTop: 6,
+  },
+  sourceButton: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: RADIUS.pill,
+    backgroundColor: COLORS.cream,
+  },
+  sourceLabel: {
+    fontFamily: FONTS.sans,
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.ink,
   },
 
   /* Error */
