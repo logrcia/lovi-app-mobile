@@ -16,6 +16,7 @@ import { CreateAlbumModal } from '../components/CreateAlbumModal';
 import { LoviCard } from '../components/LoviCard';
 import { ManageAlbumMemoriesModal } from '../components/ManageAlbumMemoriesModal';
 import { ScheduleAppointmentModal } from '../components/ScheduleAppointmentModal';
+import type { NewAlbumDraft } from '../lib/repositories/albums';
 import { Sticker } from '../components/Sticker';
 import {
   alpha,
@@ -37,17 +38,16 @@ interface PetProfileScreenProps {
   albums: Album[];
   vaccines: Vaccine[];
   appointments: Appointment[];
-  isOwnerView: boolean;
-  onToggleOwnerView: () => void;
+  onBack: () => void;
   onFollowToggle: (petId: string) => void;
   onOpenCreate: () => void;
   onOpenCalendar: () => void;
   onSelectPet: (petId: string) => void;
   onOpenOwnerProfile: (owner: Pet['owner']) => void;
-  onSaveAppointment: (appointment: Omit<Appointment, 'id' | 'isUpcoming'>) => void;
-  onSaveVaccine: (vaccine: Omit<Vaccine, 'id'>) => void;
-  onCreateAlbum: (album: Omit<Album, 'id' | 'memoriesCount'>) => void;
-  onToggleMemoryInAlbum: (memoryId: string, addToAlbum: boolean, albumId: string) => void;
+  onSaveAppointment: (appointment: Omit<Appointment, 'id' | 'isUpcoming'>) => Promise<void>;
+  onSaveVaccine: (vaccine: Omit<Vaccine, 'id'>) => Promise<void>;
+  onCreateAlbum: (album: NewAlbumDraft) => Promise<void>;
+  onToggleMemoryInAlbum: (memoryId: string, addToAlbum: boolean, albumId: string) => Promise<void>;
 }
 
 type TabKey = 'recuerdos' | 'albumes' | 'vacunas' | 'turnos';
@@ -81,8 +81,7 @@ export const PetProfileScreen: React.FC<PetProfileScreenProps> = ({
   albums,
   vaccines,
   appointments,
-  isOwnerView,
-  onToggleOwnerView,
+  onBack,
   onFollowToggle,
   onOpenCreate,
   onOpenCalendar,
@@ -107,7 +106,9 @@ export const PetProfileScreen: React.FC<PetProfileScreenProps> = ({
   const petAlbums = albums.filter((a) => a.petId === pet.id);
   const petVaccines = vaccines.filter((v) => v.petId === pet.id);
   const petAppointments = appointments.filter((a) => a.petId === pet.id && a.isUpcoming);
-  const isActualOwner = pet.isMine && isOwnerView;
+  // Ownership comes from the data, not from a prototype toggle: your pets are yours,
+  // everyone else's are visited as a guest.
+  const isActualOwner = pet.isMine;
 
   const activeAlbum = selectedAlbumId ? albums.find((a) => a.id === selectedAlbumId) ?? null : null;
   const activeAlbumMemories = activeAlbum
@@ -174,29 +175,15 @@ export const PetProfileScreen: React.FC<PetProfileScreenProps> = ({
         }}
         showsVerticalScrollIndicator={false}
       >
-        {/* Privacy switcher */}
-        <View style={styles.privacySwitcher}>
-          <View style={styles.privacyLabel}>
-            <Ionicons name="person-circle" size={16} color={COLORS.navy} />
-            <Text style={styles.privacyText}>
-              Modo:{' '}
-              <Text style={styles.privacyMode}>
-                {isActualOwner ? 'Dueño (Privado + Social)' : 'Visitante (Público)'}
-              </Text>
-            </Text>
-          </View>
-
-          <Pressable
-            onPress={onToggleOwnerView}
-            style={({ pressed }) => [styles.privacyButton, pressed && styles.pressed]}
-            accessibilityRole="button"
-            accessibilityLabel={`Ver como ${isActualOwner ? 'Visitante' : 'Dueño'}`}
-          >
-            <Text style={styles.privacyButtonLabel}>
-              Ver como {isActualOwner ? 'Visitante' : 'Dueño'}
-            </Text>
-          </Pressable>
-        </View>
+        <Pressable
+          onPress={onBack}
+          style={({ pressed }) => [styles.profileBack, pressed && styles.profileBackPressed]}
+          accessibilityRole="button"
+          accessibilityLabel="Volver a la pantalla anterior"
+        >
+          <Ionicons name="chevron-back" size={14} color={INK_WASH.medium} />
+          <Text style={styles.backLabel}>Volver</Text>
+        </Pressable>
 
         {/* Profile header */}
         <View style={styles.hero}>
@@ -758,50 +745,6 @@ const styles = StyleSheet.create({
     opacity: 0.75,
   },
 
-  /* Privacy switcher */
-  privacySwitcher: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-    padding: 12,
-    borderRadius: RADIUS.md,
-    backgroundColor: alpha(COLORS.navy, 0.1),
-  },
-  privacyLabel: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    flexShrink: 1,
-  },
-  privacyText: {
-    fontFamily: FONTS.sans,
-    fontSize: 11,
-    lineHeight: 15,
-    fontWeight: '500',
-    color: COLORS.navy,
-    flexShrink: 1,
-  },
-  privacyMode: {
-    fontWeight: '700',
-  },
-  privacyButton: {
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.parchment,
-    ...MICRO_SHADOW,
-  },
-  privacyButtonLabel: {
-    fontFamily: FONTS.sans,
-    fontSize: 10,
-    lineHeight: 14,
-    letterSpacing: 1.1,
-    textTransform: 'uppercase',
-    fontWeight: '700',
-    color: COLORS.ink,
-  },
-
   /* Hero */
   hero: {
     alignItems: 'center',
@@ -1088,6 +1031,18 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.pill,
     backgroundColor: COLORS.parchment,
     ...MICRO_SHADOW,
+  },
+  profileBack: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: RADIUS.pill,
+  },
+  profileBackPressed: {
+    backgroundColor: COLORS.parchment,
   },
   backLabel: {
     fontFamily: FONTS.sans,

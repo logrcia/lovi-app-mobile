@@ -10,7 +10,7 @@ interface AddVaccineModalProps {
   isOpen: boolean;
   onClose: () => void;
   pet: Pet;
-  onSaveVaccine: (vaccine: Omit<Vaccine, 'id'>) => void;
+  onSaveVaccine: (vaccine: Omit<Vaccine, 'id'>) => Promise<void>;
 }
 
 type IconName = React.ComponentProps<typeof Ionicons>['name'];
@@ -88,6 +88,7 @@ export const AddVaccineModal: React.FC<AddVaccineModalProps> = ({
   const [date, setDate] = React.useState('15 Nov 2026');
   const [status, setStatus] = React.useState<VaccineStatus>('Próxima dosis');
   const [notes, setNotes] = React.useState('');
+  const [saving, setSaving] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
   React.useEffect(() => {
@@ -97,26 +98,41 @@ export const AddVaccineModal: React.FC<AddVaccineModalProps> = ({
     setDate('15 Nov 2026');
     setStatus('Próxima dosis');
     setNotes('');
+    setSaving(false);
     setErrorMessage(null);
   }, [isOpen]);
 
-  const canSave = name.trim().length > 0;
+  const canSave = name.trim().length > 0 && !saving;
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!name.trim()) {
       setErrorMessage('El nombre de la vacuna es obligatorio.');
       return;
     }
 
-    onSaveVaccine({
-      petId: pet.id,
-      name: name.trim(),
-      date: date.trim() || 'Próximamente',
-      status,
-      notes: notes.trim() || undefined,
-    });
+    if (!date.trim()) {
+      setErrorMessage('La fecha es obligatoria, por ejemplo 15 Nov 2026.');
+      return;
+    }
 
-    onClose();
+    setSaving(true);
+    try {
+      await onSaveVaccine({
+        petId: pet.id,
+        name: name.trim(),
+        date: date.trim(),
+        status,
+        notes: notes.trim() || undefined,
+      });
+
+      onClose();
+    } catch (unknownError) {
+      setErrorMessage(
+        unknownError instanceof Error ? unknownError.message : 'Probá de nuevo.'
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -130,7 +146,8 @@ export const AddVaccineModal: React.FC<AddVaccineModalProps> = ({
       footer={
         <>
           <Pressable
-            onPress={handleSubmit}
+            onPress={() => void handleSubmit()}
+            disabled={!canSave}
             style={({ pressed }) => [
               styles.primary,
               !canSave && styles.primaryDisabled,
@@ -226,7 +243,8 @@ export const AddVaccineModal: React.FC<AddVaccineModalProps> = ({
             ? 'Dosis aplicada y vigente.'
             : status === 'Próxima dosis'
               ? 'Recordatorio de la próxima aplicación.'
-              : 'Dosis a repetir o vencida.'}
+              : 'Dosis a repetir o vencida.'}{' '}
+          El estado se recalcula solo según la fecha.
         </Text>
       </View>
 

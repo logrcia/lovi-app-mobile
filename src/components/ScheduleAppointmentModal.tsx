@@ -1,5 +1,5 @@
 import React from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { alpha, COLORS, FONTS, INK_WASH, RADIUS, SHADOWS } from '../theme';
@@ -10,7 +10,7 @@ interface ScheduleAppointmentModalProps {
   isOpen: boolean;
   onClose: () => void;
   pet: Pet;
-  onSaveAppointment: (appointment: Omit<Appointment, 'id' | 'isUpcoming'>) => void;
+  onSaveAppointment: (appointment: Omit<Appointment, 'id' | 'isUpcoming'>) => Promise<void>;
 }
 
 type AppointmentType = Appointment['type'];
@@ -77,6 +77,7 @@ export const ScheduleAppointmentModal: React.FC<ScheduleAppointmentModalProps> =
   const [time, setTime] = React.useState(DEFAULT_TIME);
   const [location, setLocation] = React.useState(DEFAULT_LOCATION);
   const [focusedField, setFocusedField] = React.useState<FocusedField>(null);
+  const [saving, setSaving] = React.useState(false);
 
   // Reopening never shows values left over from a previous draft.
   React.useEffect(() => {
@@ -87,22 +88,33 @@ export const ScheduleAppointmentModal: React.FC<ScheduleAppointmentModalProps> =
     setTime(DEFAULT_TIME);
     setLocation(DEFAULT_LOCATION);
     setFocusedField(null);
+    setSaving(false);
   }, [isOpen]);
 
-  const canSave = title.trim().length > 0 && isValidDate(date) && isValidTime(time);
+  const canSave = title.trim().length > 0 && isValidDate(date) && isValidTime(time) && !saving;
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!canSave) return;
 
-    onSaveAppointment({
-      petId: pet.id,
-      title: title.trim(),
-      type,
-      date,
-      time,
-      location: location.trim() || FALLBACK_LOCATION,
-    });
-    onClose();
+    setSaving(true);
+    try {
+      await onSaveAppointment({
+        petId: pet.id,
+        title: title.trim(),
+        type,
+        date,
+        time,
+        location: location.trim() || FALLBACK_LOCATION,
+      });
+      onClose();
+    } catch (unknownError) {
+      Alert.alert(
+        'No pudimos agendar el turno',
+        unknownError instanceof Error ? unknownError.message : 'Probá de nuevo.'
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -116,7 +128,7 @@ export const ScheduleAppointmentModal: React.FC<ScheduleAppointmentModalProps> =
       footer={
         <View style={styles.footer}>
           <Pressable
-            onPress={handleSubmit}
+            onPress={() => void handleSubmit()}
             disabled={!canSave}
             style={({ pressed }) => [
               styles.primaryCta,

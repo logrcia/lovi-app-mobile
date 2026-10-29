@@ -4,10 +4,11 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { alpha, COLORS, DOCK_HEIGHT, FONTS, RADIUS, SHADOWS } from '../theme';
-import type { MainTab, ScreenType } from '../types';
+import type { MainTab } from '../types';
 
 interface BottomTabBarProps {
-  currentScreen: ScreenType;
+  /** Which tab owns the current screen. `null` for surfaces reachable from anywhere (the composer). */
+  activeTab: MainTab | null;
   onNavigate: (tab: MainTab) => void;
   onOpenCreate: () => void;
 }
@@ -25,17 +26,14 @@ const TABS: Array<{ key: MainTab; label: string; icon: IconName; activeIcon: Ico
  * Floating dark dock. Home · Explorar · (+ fucsia raised) · Calendario · Mi Perfil.
  */
 export const BottomTabBar: React.FC<BottomTabBarProps> = ({
-  currentScreen,
+  activeTab,
   onNavigate,
   onOpenCreate,
 }) => {
   const insets = useSafeAreaInsets();
 
-  const isActive = (tab: MainTab) =>
-    currentScreen === tab || (tab === 'userProfile' && currentScreen === 'petProfile');
-
   const renderTab = (tab: (typeof TABS)[number]) => {
-    const active = isActive(tab.key);
+    const active = activeTab === tab.key;
 
     return (
       <Pressable

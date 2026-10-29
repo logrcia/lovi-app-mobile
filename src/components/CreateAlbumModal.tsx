@@ -1,28 +1,18 @@
 import React from 'react';
-import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
-import cocoPark from '../../assets/images/coco_park_run_1792712089196.jpg';
-import lunaNap from '../../assets/images/luna_cat_nap_1792712089280.jpg';
-import miloPortrait from '../../assets/images/milo_dog_portrait_1792712088048.jpg';
-
+import type { NewAlbumDraft } from '../lib/repositories/albums';
 import { alpha, COLORS, FONTS, INK_WASH, RADIUS, SHADOWS } from '../theme';
-import type { Album, LoviImage, Pet } from '../types';
+import type { Pet } from '../types';
 import { AppModal } from './AppModal';
 
 interface CreateAlbumModalProps {
   isOpen: boolean;
   onClose: () => void;
   pet: Pet;
-  onCreateAlbum: (album: Omit<Album, 'id' | 'memoriesCount'>) => void;
+  onCreateAlbum: (album: NewAlbumDraft) => Promise<void>;
 }
-
-/** Bundled cover options offered next to the pet's own photo. */
-const COVER_PRESETS: ReadonlyArray<{ photo: LoviImage; label: string }> = [
-  { photo: miloPortrait, label: 'Golden / Perro' },
-  { photo: cocoPark, label: 'Cachorro / Parque' },
-  { photo: lunaNap, label: 'Gato siesta' },
-];
 
 interface FieldProps {
   label: string;
@@ -75,8 +65,9 @@ const Field: React.FC<FieldProps> = ({
 };
 
 /**
- * "Nuevo álbum para {pet}" — title, description and a cover picked from bundled photos.
- * Defaults to the pet's own avatar and resets on every reopen.
+ * "Nuevo álbum para {pet}" — title and description.
+ * The cover is not picked here: `albums.cover_memory_id` points at a memory row, so an empty
+ * album has nothing to point at until the first photo is added to it.
  */
 export const CreateAlbumModal: React.FC<CreateAlbumModalProps> = ({
   isOpen,
@@ -86,41 +77,39 @@ export const CreateAlbumModal: React.FC<CreateAlbumModalProps> = ({
 }) => {
   const [title, setTitle] = React.useState('');
   const [description, setDescription] = React.useState('');
-  const [coverIndex, setCoverIndex] = React.useState(0);
+  const [saving, setSaving] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
-
-  const coverOptions = React.useMemo(
-    () => [{ photo: pet.avatar, label: `Foto de ${pet.name}` }, ...COVER_PRESETS],
-    [pet.avatar, pet.name]
-  );
 
   React.useEffect(() => {
     if (!isOpen) return;
 
     setTitle('');
     setDescription('');
-    setCoverIndex(0);
+    setSaving(false);
     setErrorMessage(null);
   }, [isOpen, pet]);
 
-  const canSave = title.trim().length > 0;
+  const canSave = title.trim().length > 0 && !saving;
 
-  const handleSubmit = () => {
-    if (!title.trim()) {
-      setErrorMessage('El título del álbum es obligatorio.');
-      return;
+  const handleSubmit = async () => {
+    if (!canSave) return;
+
+    setSaving(true);
+    try {
+      await onCreateAlbum({
+        petId: pet.id,
+        title: title.trim(),
+        description: description.trim() || undefined,
+      });
+
+      onClose();
+    } catch (unknownError) {
+      setErrorMessage(
+        unknownError instanceof Error ? unknownError.message : 'Probá de nuevo.'
+      );
+    } finally {
+      setSaving(false);
     }
-
-    const coverUrl = coverOptions[coverIndex]?.photo ?? pet.avatar;
-
-    onCreateAlbum({
-      petId: pet.id,
-      title: title.trim(),
-      description: description.trim() || undefined,
-      coverUrl,
-    });
-
-    onClose();
   };
 
   return (
@@ -134,7 +123,8 @@ export const CreateAlbumModal: React.FC<CreateAlbumModalProps> = ({
       footer={
         <>
           <Pressable
-            onPress={handleSubmit}
+            onPress={() => void handleSubmit()}
+            disabled={saving}
             style={({ pressed }) => [
               styles.primary,
               !canSave && styles.primaryDisabled,
@@ -186,41 +176,10 @@ export const CreateAlbumModal: React.FC<CreateAlbumModalProps> = ({
       />
 
       <View style={styles.field}>
-        <Text style={styles.label}>Imagen de portada (opcional)</Text>
-
-        <View style={styles.coverRow}>
-          {coverOptions.map((option, index) => {
-            const selected = index === coverIndex;
-
-            return (
-              <Pressable
-                key={`${option.label}-${index}`}
-                onPress={() => setCoverIndex(index)}
-                style={({ pressed }) => [
-                  styles.coverCell,
-                  selected && styles.coverCellSelected,
-                  pressed && styles.pressed,
-                ]}
-                accessibilityRole="button"
-                accessibilityState={{ selected }}
-                accessibilityLabel={option.label}
-              >
-                <Image source={option.photo} style={styles.coverImage} resizeMode="cover" />
-
-                {selected ? (
-                  <View style={styles.coverOverlay}>
-                    <View style={styles.coverCheck}>
-                      <Ionicons name="checkmark" size={12} color={COLORS.parchment} />
-                    </View>
-                  </View>
-                ) : null}
-              </Pressable>
-            );
-          })}
-        </View>
+        <Text style={styles.label}>Portada</Text>
 
         <Text style={styles.caption}>
-          {coverOptions[coverIndex]?.label ?? `Foto de ${pet.name}`}
+          Se toma de la primera foto que agregues al álbum.
         </Text>
       </View>
     </AppModal>

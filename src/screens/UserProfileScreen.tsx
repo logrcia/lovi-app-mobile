@@ -3,6 +3,7 @@ import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-nati
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { Sticker } from '../components/Sticker';
+import { FollowingModal } from '../components/FollowingModal';
 import {
   alpha,
   CARD_SURFACE,
@@ -19,6 +20,8 @@ import type { Pet, UserProfile } from '../types';
 interface UserProfileScreenProps {
   user: UserProfile;
   pets: Pet[];
+  /** Pets the logged-in profile follows. Only meaningful when `user` is that profile. */
+  followingPets: Pet[];
   currentUserId: string;
   onSelectPet: (petId: string) => void;
   onOpenCreate: () => void;
@@ -71,6 +74,7 @@ const PREFERENCES: PreferenceRow[] = [
 export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
   user,
   pets,
+  followingPets,
   currentUserId,
   onSelectPet,
   onOpenAddPet,
@@ -78,6 +82,8 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
   onSignOut,
   onBack,
 }) => {
+  const [isFollowingOpen, setIsFollowingOpen] = React.useState(false);
+
   const isMe = user.id === currentUserId;
   const displayPets = pets.filter((pet) =>
     isMe ? pet.isMine : pet.owner.id === user.id || pet.owner.name === user.name
@@ -89,6 +95,13 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
+      <FollowingModal
+        visible={isFollowingOpen}
+        onClose={() => setIsFollowingOpen(false)}
+        pets={followingPets}
+        onSelectPet={onSelectPet}
+      />
+
       {onBack ? (
         <Pressable
           onPress={onBack}
@@ -237,6 +250,36 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
         </View>
       </View>
 
+      {/* Who this profile follows */}
+      {isMe ? (
+        <Pressable
+          onPress={() => setIsFollowingOpen(true)}
+          style={({ pressed }) => [
+            styles.followingCard,
+            pressed && styles.followingCardPressed,
+          ]}
+          accessibilityRole="button"
+          accessibilityLabel={`Ver las cuentas que seguís (${followingPets.length})`}
+        >
+          <View style={styles.followingIcon}>
+            <Ionicons name="heart" size={16} color={COLORS.fucsia} />
+          </View>
+
+          <View style={styles.followingCopy}>
+            <Text style={styles.followingTitle}>
+              {followingPets.length === 0
+                ? 'No seguís a ninguna cuenta'
+                : followingPets.length === 1
+                  ? 'Seguís a 1 cuenta'
+                  : `Seguís a ${followingPets.length} cuentas`}
+            </Text>
+            <Text style={styles.followingSubtitle}>Ver la lista de mascotas que seguís</Text>
+          </View>
+
+          <Ionicons name="chevron-forward" size={16} color={alpha(COLORS.ink, 0.6)} />
+        </Pressable>
+      ) : null}
+
       {/* Account & preferences — only for the current user */}
       {isMe ? (
         <View style={styles.accountSection}>
@@ -381,6 +424,42 @@ const styles = StyleSheet.create({
   },
   petsSection: {
     gap: 12,
+  },
+  followingCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    padding: 14,
+    ...CARD_SURFACE,
+    borderRadius: RADIUS.lg,
+  },
+  followingCardPressed: {
+    opacity: 0.85,
+  },
+  followingIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: RADIUS.pill,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: alpha(COLORS.fucsia, 0.12),
+  },
+  followingCopy: {
+    flex: 1,
+    gap: 2,
+  },
+  followingTitle: {
+    fontFamily: FONTS.sans,
+    fontSize: 13,
+    lineHeight: 18,
+    fontWeight: '700',
+    color: COLORS.ink,
+  },
+  followingSubtitle: {
+    fontFamily: FONTS.sans,
+    fontSize: 11,
+    lineHeight: 15,
+    color: alpha(COLORS.ink, 0.6),
   },
   sectionHeader: {
     flexDirection: 'row',

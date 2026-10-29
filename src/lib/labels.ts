@@ -30,3 +30,10 @@ export const APPOINTMENT_TYPE_LABEL = {
   grooming: 'peluquería',
   vaccination: 'vacunación',
 } satisfies Record<DbAppointmentType, Appointment['type']>;
+
+/** The inverse of `APPOINTMENT_TYPE_LABEL`, used when writing an appointment to Postgres. */
+export const APPOINTMENT_TYPE_DB = {
+  veterinario: 'vet',
+  peluquería: 'grooming',
+  vacunación: 'vaccination',
+} satisfies Record<Appointment['type'], DbAppointmentType>;
