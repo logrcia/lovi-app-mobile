@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, StatusBar, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, Platform, StatusBar, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AddPetModal, type NewPetDraft } from './src/components/AddPetModal';
@@ -29,7 +29,7 @@ import { ExploreScreen } from './src/screens/ExploreScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
 import { PetProfileScreen } from './src/screens/PetProfileScreen';
 import { UserProfileScreen } from './src/screens/UserProfileScreen';
-import { COLORS } from './src/theme';
+import { alpha, COLORS } from './src/theme';
 import type {
   Album,
   Appointment,
@@ -497,11 +497,23 @@ function Root() {
   return <AppShell profileId={auth.session.user.id} />;
 }
 
+/**
+ * Native builds mount `Root` straight into the window. The web deploy runs in a desktop
+ * browser, so it is framed into a phone-width column instead of stretching to the viewport.
+ */
 export default function App() {
-  return (
+  const app = (
     <SafeAreaProvider>
       <Root />
     </SafeAreaProvider>
+  );
+
+  if (Platform.OS !== 'web') return app;
+
+  return (
+    <View style={styles.webViewport}>
+      <View style={styles.webFrame}>{app}</View>
+    </View>
   );
 }
 
@@ -518,5 +530,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: COLORS.cream,
+  },
+  webViewport: {
+    flex: 1,
+    alignItems: 'center',
+    backgroundColor: alpha(COLORS.ink, 0.12),
+  },
+  webFrame: {
+    flex: 1,
+    width: '100%',
+    maxWidth: 430,
+    overflow: 'hidden',
+    backgroundColor: COLORS.cream,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: alpha(COLORS.ink, 0.1),
   },
 });

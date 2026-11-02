@@ -42,54 +42,65 @@ export const AppModal: React.FC<AppModalProps> = ({
 }) => {
   const insets = useSafeAreaInsets();
 
-  return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
-      <View style={styles.root}>
-        <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Cerrar modal" />
+  const overlay = (
+    <>
+      <Pressable style={styles.backdrop} onPress={onClose} accessibilityLabel="Cerrar modal" />
 
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-          style={styles.keyboardLayer}
-          pointerEvents="box-none"
-        >
-          <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-            <View style={styles.handle} />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.keyboardLayer}
+        pointerEvents="box-none"
+      >
+        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+          <View style={styles.handle} />
 
-            <View style={styles.header}>
-              <View style={styles.headerText}>
-                {eyebrow ? (
-                  <Sticker variant="parchment" style={{ backgroundColor: alpha(accent, 0.12), borderColor: alpha(accent, 0.22) }}>
-                    {eyebrow}
-                  </Sticker>
-                ) : null}
-                <Text style={[TEXT.headline, styles.title]}>{title}</Text>
-                {description ? <Text style={[TEXT.body, styles.description]}>{description}</Text> : null}
-              </View>
-
-              <Pressable
-                onPress={onClose}
-                hitSlop={10}
-                style={({ pressed }) => [styles.close, pressed && styles.pressed]}
-                accessibilityRole="button"
-                accessibilityLabel="Cerrar"
-              >
-                <Ionicons name="close" size={18} color={INK_WASH.medium} />
-              </Pressable>
+          <View style={styles.header}>
+            <View style={styles.headerText}>
+              {eyebrow ? (
+                <Sticker variant="parchment" style={{ backgroundColor: alpha(accent, 0.12), borderColor: alpha(accent, 0.22) }}>
+                  {eyebrow}
+                </Sticker>
+              ) : null}
+              <Text style={[TEXT.headline, styles.title]}>{title}</Text>
+              {description ? <Text style={[TEXT.body, styles.description]}>{description}</Text> : null}
             </View>
 
-            <ScrollView
-              style={styles.body}
-              contentContainerStyle={styles.bodyContent}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
+            <Pressable
+              onPress={onClose}
+              hitSlop={10}
+              style={({ pressed }) => [styles.close, pressed && styles.pressed]}
+              accessibilityRole="button"
+              accessibilityLabel="Cerrar"
             >
-              {children}
-            </ScrollView>
-
-            {footer ? <View style={styles.footer}>{footer}</View> : null}
+              <Ionicons name="close" size={18} color={INK_WASH.medium} />
+            </Pressable>
           </View>
-        </KeyboardAvoidingView>
-      </View>
+
+          <ScrollView
+            style={styles.body}
+            contentContainerStyle={styles.bodyContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            {children}
+          </ScrollView>
+
+          {footer ? <View style={styles.footer}>{footer}</View> : null}
+        </View>
+      </KeyboardAvoidingView>
+    </>
+  );
+
+  // `react-native-web` portals `Modal` onto `document.body`, which would escape the phone-width
+  // frame set in App.tsx. Render the sheet inline on web so it stays inside the frame.
+  if (Platform.OS === 'web') {
+    if (!visible) return null;
+    return <View style={[styles.root, styles.webOverlay]}>{overlay}</View>;
+  }
+
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
+      <View style={styles.root}>{overlay}</View>
     </Modal>
   );
 };
@@ -98,6 +109,14 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     justifyContent: 'flex-end',
+  },
+  webOverlay: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    zIndex: 20,
   },
   backdrop: {
     position: 'absolute',
