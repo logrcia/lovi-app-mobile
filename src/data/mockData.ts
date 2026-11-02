@@ -139,6 +139,7 @@ export const INITIAL_MEMORIES: LoviMemory[] = [
     isOwn: true,
     isLiked: true,
     commentsCount: 3,
+    likesCount: 12,
     albumId: 'album-siestas',
   },
   {
@@ -154,6 +155,7 @@ export const INITIAL_MEMORIES: LoviMemory[] = [
     isOwn: false,
     isLiked: false,
     commentsCount: 2,
+    likesCount: 0,
     albumId: 'album-luna-rincones',
   },
   {
@@ -169,6 +171,7 @@ export const INITIAL_MEMORIES: LoviMemory[] = [
     isOwn: false,
     isLiked: false,
     commentsCount: 1,
+    likesCount: 5,
     albumId: 'album-paseos',
   },
   {
@@ -183,6 +186,7 @@ export const INITIAL_MEMORIES: LoviMemory[] = [
     isOwn: true,
     isLiked: false,
     commentsCount: 0,
+    likesCount: 0,
     albumId: 'album-siestas',
   },
   {
@@ -198,6 +202,7 @@ export const INITIAL_MEMORIES: LoviMemory[] = [
     isOwn: true,
     isLiked: true,
     commentsCount: 1,
+    likesCount: 8,
     albumId: 'album-bimba-ventana',
   },
   {
@@ -213,6 +218,7 @@ export const INITIAL_MEMORIES: LoviMemory[] = [
     isOwn: false,
     isLiked: false,
     commentsCount: 0,
+    likesCount: 21,
   },
   {
     id: 'lovi-7',
@@ -227,6 +233,7 @@ export const INITIAL_MEMORIES: LoviMemory[] = [
     isOwn: true,
     isLiked: false,
     commentsCount: 1,
+    likesCount: 3,
     albumId: 'album-paseos',
   },
   {
@@ -241,6 +248,7 @@ export const INITIAL_MEMORIES: LoviMemory[] = [
     isOwn: true,
     isLiked: false,
     commentsCount: 2,
+    likesCount: 4,
     albumId: 'album-bimba-ventana',
   },
 ];

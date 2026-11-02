@@ -370,16 +370,26 @@ function AppShell({ profileId }: { profileId: string }) {
 
   /**
    * The flip lands in the shared `memories` array, so Home and the pet profile show the same
-   * state for the same memory without a refetch. If the write fails, that one memory is
-   * reverted to the value it had before the tap and the error is surfaced.
+   * state for the same memory without a refetch. The count moves in the same update, so the
+   * label and the number never disagree for a frame. If the write fails, that one memory is
+   * reverted to both values it had before the tap and the error is surfaced.
    */
   const handleToggleLike = useCallback(async (memory: LoviMemory) => {
     const previousValue = memory.isLiked;
+    const previousCount = memory.likesCount;
     const nextValue = !previousValue;
 
     setMemories((previous) =>
       previous.map((candidate) =>
-        candidate.id === memory.id ? { ...candidate, isLiked: nextValue } : candidate
+        candidate.id === memory.id
+          ? {
+              ...candidate,
+              isLiked: nextValue,
+              likesCount: nextValue
+                ? candidate.likesCount + 1
+                : Math.max(0, candidate.likesCount - 1),
+            }
+          : candidate
       )
     );
 
@@ -388,7 +398,9 @@ function AppShell({ profileId }: { profileId: string }) {
     } catch (unknownError) {
       setMemories((previous) =>
         previous.map((candidate) =>
-          candidate.id === memory.id ? { ...candidate, isLiked: previousValue } : candidate
+          candidate.id === memory.id
+            ? { ...candidate, isLiked: previousValue, likesCount: previousCount }
+            : candidate
         )
       );
       Alert.alert(

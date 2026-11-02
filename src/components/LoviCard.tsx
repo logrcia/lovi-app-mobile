@@ -41,6 +41,12 @@ export const LoviCard: React.FC<LoviCardProps> = ({
   // The like lives in the memory row, hydrated once for the feed, so Home and the pet profile
   // agree without a refetch. The card only renders it and asks for the change.
   const liked = memory.isLiked;
+  // The count is a suffix, so the zero case renders exactly the label it always did.
+  const likesCount = memory.likesCount;
+  const likesCountSuffix = likesCount > 0 ? ` · ${likesCount}` : null;
+  const likeActionLabel = liked ? 'Quitar me gusta' : 'Me gusta';
+  const likeAccessibilityLabel =
+    likesCount > 0 ? `${likeActionLabel}, ${likesCount} me gusta` : likeActionLabel;
 
   return (
     <View style={styles.card}>
@@ -195,7 +201,7 @@ export const LoviCard: React.FC<LoviCardProps> = ({
             ]}
             accessibilityRole="button"
             accessibilityState={{ selected: liked }}
-            accessibilityLabel={liked ? 'Quitar me gusta' : 'Me gusta'}
+            accessibilityLabel={likeAccessibilityLabel}
           >
             <Ionicons
               name={liked ? 'heart' : 'heart-outline'}
@@ -204,6 +210,9 @@ export const LoviCard: React.FC<LoviCardProps> = ({
             />
             <Text style={[styles.likeLabel, liked ? styles.likedLabel : styles.unlikedLabel]}>
               {liked ? 'Te gusta' : 'Me gusta'}
+              {likesCountSuffix ? (
+                <Text style={styles.commentCount}>{likesCountSuffix}</Text>
+              ) : null}
             </Text>
           </Pressable>
 

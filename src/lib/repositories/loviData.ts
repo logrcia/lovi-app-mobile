@@ -135,7 +135,7 @@ function toUserProfile(profile: DbProfile | undefined, profileId: string): UserP
  * calendar are all derived here from rows.
  */
 export async function fetchLoviData(profileId: string): Promise<LoviData> {
-  const [petsResult, profilesResult, followsResult, memoriesResult, albumsResult, vaccinesResult, appointmentsResult, commentsResult, likedMemoryIds] =
+  const [petsResult, profilesResult, followsResult, memoriesResult, albumsResult, vaccinesResult, appointmentsResult, commentsResult, likesResult, likedMemoryIds] =
     await Promise.all([
       supabase.from('pets').select('*').order('name'),
       supabase.from('profiles').select('*'),
@@ -147,6 +147,9 @@ export async function fetchLoviData(profileId: string): Promise<LoviData> {
       // Failure-tolerant on purpose: the comments migration is applied by hand, and the feed
       // must keep loading (with counts at 0) before that table exists.
       supabase.from('memory_comments').select('memory_id'),
+      // Same reason, and it stays out of the shared `failure` chain so a missing table costs
+      // only the like counts instead of the whole feed.
+      supabase.from('memory_likes').select('memory_id'),
       // Same reason: the likes migration is applied by hand too, and a missing table must
       // cost every heart, not the whole feed.
       listLikedMemoryIds(profileId).catch(() => new Set<string>()),
@@ -180,14 +183,20 @@ export async function fetchLoviData(profileId: string): Promise<LoviData> {
     followersByPet.set(row.pet_id, (followersByPet.get(row.pet_id) ?? 0) + 1);
   }
 
-  // A missing table is not a feed failure: the query above is the only one whose error is
-  // swallowed here, and it only ever costs the comment counts.
+  // A missing table is not a feed failure: these two queries are the only ones whose errors are
+  // swallowed here, and they only ever cost the comment and like counts.
   const commentRows: { memory_id: string }[] = commentsResult.error
     ? []
     : (commentsResult.data ?? []);
   const commentsByMemory = new Map<string, number>();
   for (const row of commentRows) {
     commentsByMemory.set(row.memory_id, (commentsByMemory.get(row.memory_id) ?? 0) + 1);
+  }
+
+  const likeRows: { memory_id: string }[] = likesResult.error ? [] : (likesResult.data ?? []);
+  const likesByMemory = new Map<string, number>();
+  for (const row of likeRows) {
+    likesByMemory.set(row.memory_id, (likesByMemory.get(row.memory_id) ?? 0) + 1);
   }
 
   const toPet = (pet: DbPet): Pet => {
@@ -238,6 +247,7 @@ export async function fetchLoviData(profileId: string): Promise<LoviData> {
         isRecommendation: !followedPetIds.has(memory.pet_id),
         isOwn: petById.get(memory.pet_id)?.isMine ?? false,
         commentsCount: commentsByMemory.get(memory.id) ?? 0,
+        likesCount: likesByMemory.get(memory.id) ?? 0,
         isLiked: likedMemoryIds.has(memory.id),
       };
     });

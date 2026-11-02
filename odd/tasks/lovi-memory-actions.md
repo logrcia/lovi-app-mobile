@@ -182,5 +182,25 @@ Deviation from the spec, corrected: the requested index on `memory_id` was redun
 composite primary key's leading column, while the only query we run filters `user_id`. The
 index is now `memory_likes_user_id_idx on (user_id)`.
 
-`memory_likes` is **not applied to the remote database yet**, same as `memory_comments`.
+Both `memory_likes` and `memory_comments` were applied to the remote database through the
+Supabase SQL editor. Verified with the anon key: `GET /rest/v1/memory_comments` and
+`GET /rest/v1/memory_likes` both return `200` with an empty array.
+
+## Scope addition — like counts (authorized after delivery)
+
+The like button must show how many likes a memory has.
+
+| ID | Task | Status |
+| --- | --- | --- |
+| T16 | `LoviMemory.likesCount`, hydrated from an aggregate of `memory_likes` in `loviData.ts` | Done |
+| T17 | `LoviCard` renders the count next to the existing label | Done |
+| T18 | `handleToggleLike` moves the count optimistically with the toggle, and reverts both on failure | Done |
+
+`npx tsc --noEmit` exit 0. `npx expo export -p web` exit 0. `npx expo lint` 0 errors / 14
+pre-existing warnings. The count renders as a suffix (`Me gusta · 12`) and is omitted
+entirely at zero, so the previous label is preserved unchanged.
+
+
+Out: counts on comments, per-user like lists, and any realtime updates.
+
 
