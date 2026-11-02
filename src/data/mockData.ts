@@ -136,6 +136,8 @@ export const INITIAL_MEMORIES: LoviMemory[] = [
     mediaUrl: miloPortrait,
     createdAt: 'Hoy · 11:42',
     isRecommendation: false,
+    isOwn: true,
+    commentsCount: 3,
     albumId: 'album-siestas',
   },
   {
@@ -148,6 +150,8 @@ export const INITIAL_MEMORIES: LoviMemory[] = [
     mediaUrl: lunaNap,
     createdAt: 'Ayer · 16:15',
     isRecommendation: false,
+    isOwn: false,
+    commentsCount: 2,
     albumId: 'album-luna-rincones',
   },
   {
@@ -160,6 +164,8 @@ export const INITIAL_MEMORIES: LoviMemory[] = [
     mediaUrl: cocoPark,
     createdAt: '18 Oct · 17:30',
     isRecommendation: true,
+    isOwn: false,
+    commentsCount: 1,
     albumId: 'album-paseos',
   },
   {
@@ -171,6 +177,8 @@ export const INITIAL_MEMORIES: LoviMemory[] = [
     mediaType: 'text',
     createdAt: '15 Oct · 09:20',
     isRecommendation: false,
+    isOwn: true,
+    commentsCount: 0,
     albumId: 'album-siestas',
   },
   {
@@ -183,6 +191,8 @@ export const INITIAL_MEMORIES: LoviMemory[] = [
     audioDuration: '0:42',
     createdAt: '12 Oct · 14:05',
     isRecommendation: false,
+    isOwn: true,
+    commentsCount: 1,
     albumId: 'album-bimba-ventana',
   },
   {
@@ -195,6 +205,8 @@ export const INITIAL_MEMORIES: LoviMemory[] = [
     mediaUrl: oliverWindow,
     createdAt: '10 Oct · 18:00',
     isRecommendation: true,
+    isOwn: false,
+    commentsCount: 0,
   },
   {
     id: 'lovi-7',
@@ -206,6 +218,8 @@ export const INITIAL_MEMORIES: LoviMemory[] = [
     mediaUrl: cocoPark,
     createdAt: '08 Oct · 16:20',
     isRecommendation: false,
+    isOwn: true,
+    commentsCount: 1,
     albumId: 'album-paseos',
   },
   {
@@ -217,6 +231,8 @@ export const INITIAL_MEMORIES: LoviMemory[] = [
     mediaUrl: lunaNap,
     createdAt: '05 Oct · 10:15',
     isRecommendation: false,
+    isOwn: true,
+    commentsCount: 2,
     albumId: 'album-bimba-ventana',
   },
 ];

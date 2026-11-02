@@ -45,6 +45,9 @@ export interface LoviMemory {
   createdAt: string;
   /** "De cuentas que no seguís" — used by the home feed recommendation banner. */
   isRecommendation?: boolean;
+  /** True when the memory belongs to a pet the signed-in user owns. Gates the delete action. */
+  isOwn: boolean;
+  commentsCount: number;
   albumId?: string;
 }
 

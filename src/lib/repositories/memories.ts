@@ -102,3 +102,31 @@ async function insertMemory(draft: NewMemoryDraft, mediaPath: string | null): Pr
 
   return data.id;
 }
+
+/**
+ * Deletes the row first, then the object. The order matters: removing the file before the row
+ * could leave a memory pointing at nothing if the delete then failed. `storage.remove` reports
+ * failures through `error` instead of throwing, so a leftover object never surfaces as a
+ * failed delete — the feed is already free of the memory at that point.
+ */
+export async function deleteMemory(id: string): Promise<void> {
+  const { data, error: readError } = await supabase
+    .from('memories')
+    .select('media_path')
+    .eq('id', id)
+    .maybeSingle();
+
+  if (readError) throw new Error(readableError(readError.message));
+
+  const { error: deleteError } = await supabase
+    .from('memories')
+    .delete()
+    .eq('id', id);
+
+  if (deleteError) throw new Error(readableError(deleteError.message));
+
+  const mediaPath = data?.media_path ?? null;
+  if (mediaPath) {
+    await supabase.storage.from('pet-media').remove([mediaPath]);
+  }
+}

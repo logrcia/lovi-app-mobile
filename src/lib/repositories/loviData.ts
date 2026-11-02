@@ -73,8 +73,8 @@ function formatAge(birthday: string | null): string {
   return years === 1 ? '1 año' : `${years} años`;
 }
 
-/** `happened_at` → `'Hoy · 11:42'`, computed at render time instead of stored. */
-function formatMemoryStamp(iso: string): string {
+/** `happened_at` / `created_at` → `'Hoy · 11:42'`, computed at render time instead of stored. */
+export function formatMemoryStamp(iso: string): string {
   const date = new Date(iso);
   const now = new Date();
   const time = `${date.getHours()}:${pad(date.getMinutes())}`;
@@ -134,7 +134,7 @@ function toUserProfile(profile: DbProfile | undefined, profileId: string): UserP
  * calendar are all derived here from rows.
  */
 export async function fetchLoviData(profileId: string): Promise<LoviData> {
-  const [petsResult, profilesResult, followsResult, memoriesResult, albumsResult, vaccinesResult, appointmentsResult] =
+  const [petsResult, profilesResult, followsResult, memoriesResult, albumsResult, vaccinesResult, appointmentsResult, commentsResult] =
     await Promise.all([
       supabase.from('pets').select('*').order('name'),
       supabase.from('profiles').select('*'),
@@ -143,6 +143,9 @@ export async function fetchLoviData(profileId: string): Promise<LoviData> {
       supabase.from('albums').select('*').order('created_at'),
       supabase.from('vaccines').select('*'),
       supabase.from('appointments').select('*').order('starts_at'),
+      // Failure-tolerant on purpose: the comments migration is applied by hand, and the feed
+      // must keep loading (with counts at 0) before that table exists.
+      supabase.from('memory_comments').select('memory_id'),
     ]);
 
   const failure =
@@ -171,6 +174,16 @@ export async function fetchLoviData(profileId: string): Promise<LoviData> {
   const followersByPet = new Map<string, number>();
   for (const row of follows) {
     followersByPet.set(row.pet_id, (followersByPet.get(row.pet_id) ?? 0) + 1);
+  }
+
+  // A missing table is not a feed failure: the query above is the only one whose error is
+  // swallowed here, and it only ever costs the comment counts.
+  const commentRows: { memory_id: string }[] = commentsResult.error
+    ? []
+    : (commentsResult.data ?? []);
+  const commentsByMemory = new Map<string, number>();
+  for (const row of commentRows) {
+    commentsByMemory.set(row.memory_id, (commentsByMemory.get(row.memory_id) ?? 0) + 1);
   }
 
   const toPet = (pet: DbPet): Pet => {
@@ -219,6 +232,8 @@ export async function fetchLoviData(profileId: string): Promise<LoviData> {
             : undefined,
         createdAt: formatMemoryStamp(memory.happened_at),
         isRecommendation: !followedPetIds.has(memory.pet_id),
+        isOwn: petById.get(memory.pet_id)?.isMine ?? false,
+        commentsCount: commentsByMemory.get(memory.id) ?? 0,
       };
     });
 
