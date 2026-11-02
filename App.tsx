@@ -4,6 +4,8 @@ import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-cont
 
 import { AddPetModal, type NewPetDraft } from './src/components/AddPetModal';
 import { BottomTabBar } from './src/components/BottomTabBar';
+import { ConfirmModal } from './src/components/ConfirmModal';
+import { MemoryCommentsModal } from './src/components/MemoryCommentsModal';
 import {
   CURRENT_USER,
   INITIAL_ALBUMS,
@@ -19,7 +21,7 @@ import { useLoviData } from './src/lib/hooks/useLoviData';
 import { createAlbum, setMemoryAlbum, type NewAlbumDraft } from './src/lib/repositories/albums';
 import { createAppointment, createVaccine } from './src/lib/repositories/care';
 import { setPetFollowing } from './src/lib/repositories/follows';
-import { createMemory, type NewMemoryDraft } from './src/lib/repositories/memories';
+import { createMemory, deleteMemory, type NewMemoryDraft } from './src/lib/repositories/memories';
 import { createPet } from './src/lib/repositories/pets';
 import { AuthScreen } from './src/screens/AuthScreen';
 import { NoPetsScreen } from './src/screens/NoPetsScreen';
@@ -97,6 +99,9 @@ function AppShell({ profileId }: { profileId: string }) {
   const [userProfileReturn, setUserProfileReturn] = useState<ScreenType>('petProfile');
   const [petProfileReturn, setPetProfileReturn] = useState<MainTab>('home');
   const [isAddPetModalOpen, setIsAddPetModalOpen] = useState(false);
+  const [memoryToDelete, setMemoryToDelete] = useState<LoviMemory | null>(null);
+  const [isDeletingMemory, setIsDeletingMemory] = useState(false);
+  const [commentsMemory, setCommentsMemory] = useState<LoviMemory | null>(null);
 
   // ——— Remote data ——————————————————————————————————————————————
   // Starts from the fixtures so the first frame already has the editorial layout, then
@@ -354,6 +359,48 @@ function AppShell({ profileId }: { profileId: string }) {
     [remote.refetch]
   );
 
+  const handleRequestDelete = useCallback((memory: LoviMemory) => {
+    setMemoryToDelete(memory);
+  }, []);
+
+  const handleOpenComments = useCallback((memory: LoviMemory) => {
+    setCommentsMemory(memory);
+  }, []);
+
+  /**
+   * Deletes through RLS (the delete policy is the real gate; the card only decides whether to
+   * show the button). Local state drops the row immediately, so the feed never waits on a
+   * refetch that would only re-read what is already removed.
+   */
+  const handleDeleteMemory = useCallback(async (memory: LoviMemory) => {
+    setIsDeletingMemory(true);
+
+    try {
+      await deleteMemory(memory.id);
+      setMemories((previous) => previous.filter((candidate) => candidate.id !== memory.id));
+      setCommentsMemory((current) => (current?.id === memory.id ? null : current));
+      setMemoryToDelete(null);
+    } catch (unknownError) {
+      setMemoryToDelete(null);
+      Alert.alert(
+        'No pudimos eliminar el recuerdo',
+        unknownError instanceof Error ? unknownError.message : 'Probá de nuevo.'
+      );
+    } finally {
+      setIsDeletingMemory(false);
+    }
+  }, []);
+
+  const handleCommentCreated = useCallback((memoryId: string) => {
+    setMemories((previous) =>
+      previous.map((memory) =>
+        memory.id === memoryId
+          ? { ...memory, commentsCount: memory.commentsCount + 1 }
+          : memory
+      )
+    );
+  }, []);
+
   // ——— Screens ——————————————————————————————————————————————————
   const renderHome = () => (
     <HomeScreen
@@ -365,6 +412,8 @@ function AppShell({ profileId }: { profileId: string }) {
       onFollowToggle={handleFollowToggle}
       onOpenCreate={openCreateMemory}
       onOpenUserProfile={openOwnProfile}
+      onDelete={handleRequestDelete}
+      onOpenComments={handleOpenComments}
     />
   );
 
@@ -411,6 +460,8 @@ function AppShell({ profileId }: { profileId: string }) {
             onSaveVaccine={handleSaveVaccine}
             onCreateAlbum={handleCreateAlbum}
             onToggleMemoryInAlbum={handleToggleMemoryInAlbum}
+            onDelete={handleRequestDelete}
+            onOpenComments={handleOpenComments}
           />
         );
 
@@ -475,6 +526,31 @@ function AppShell({ profileId }: { profileId: string }) {
         isOpen={isAddPetModalOpen}
         onClose={() => setIsAddPetModalOpen(false)}
         onSavePet={handleAddPet}
+      />
+
+      <ConfirmModal
+        visible={memoryToDelete !== null}
+        title="¿Eliminar este recuerdo?"
+        description={
+          memoryToDelete
+            ? `«${memoryToDelete.title}» va a desaparecer de tu feed para siempre.`
+            : undefined
+        }
+        confirmLabel="Eliminar"
+        pending={isDeletingMemory}
+        onCancel={() => {
+          if (!isDeletingMemory) setMemoryToDelete(null);
+        }}
+        onConfirm={() => {
+          if (memoryToDelete) void handleDeleteMemory(memoryToDelete);
+        }}
+      />
+
+      <MemoryCommentsModal
+        visible={commentsMemory !== null}
+        memory={commentsMemory}
+        onClose={() => setCommentsMemory(null)}
+        onCommentCreated={handleCommentCreated}
       />
     </View>
   );

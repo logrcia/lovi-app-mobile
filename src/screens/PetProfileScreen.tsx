@@ -48,6 +48,8 @@ interface PetProfileScreenProps {
   onSaveVaccine: (vaccine: Omit<Vaccine, 'id'>) => Promise<void>;
   onCreateAlbum: (album: NewAlbumDraft) => Promise<void>;
   onToggleMemoryInAlbum: (memoryId: string, addToAlbum: boolean, albumId: string) => Promise<void>;
+  onDelete?: (memory: LoviMemory) => void;
+  onOpenComments?: (memory: LoviMemory) => void;
 }
 
 type TabKey = 'recuerdos' | 'albumes' | 'vacunas' | 'turnos';
@@ -91,6 +93,8 @@ export const PetProfileScreen: React.FC<PetProfileScreenProps> = ({
   onSaveVaccine,
   onCreateAlbum,
   onToggleMemoryInAlbum,
+  onDelete,
+  onOpenComments,
 }) => {
   const [activeTab, setActiveTab] = React.useState<TabKey>('recuerdos');
 
@@ -158,6 +162,8 @@ export const PetProfileScreen: React.FC<PetProfileScreenProps> = ({
             pet={pet}
             onPetClick={onSelectPet}
             onFollowToggle={onFollowToggle}
+            onDelete={onDelete}
+            onOpenComments={onOpenComments}
           />
         ))}
       </View>
@@ -358,6 +364,8 @@ export const PetProfileScreen: React.FC<PetProfileScreenProps> = ({
                   pet={pet}
                   onPetClick={onSelectPet}
                   onFollowToggle={onFollowToggle}
+                  onDelete={onDelete}
+                  onOpenComments={onOpenComments}
                 />
               ))
             )}

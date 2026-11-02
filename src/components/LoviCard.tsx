@@ -12,6 +12,8 @@ interface LoviCardProps {
   pet: Pet;
   onPetClick: (petId: string) => void;
   onFollowToggle?: (petId: string) => void;
+  onDelete?: (memory: LoviMemory) => void;
+  onOpenComments?: (memory: LoviMemory) => void;
 }
 
 const AUDIO_BARS = [
@@ -26,7 +28,14 @@ const AUDIO_BARS = [
 ];
 
 /** Editorial scrapbook card: one memory, its author pet and its social actions. */
-export const LoviCard: React.FC<LoviCardProps> = ({ memory, pet, onPetClick, onFollowToggle }) => {
+export const LoviCard: React.FC<LoviCardProps> = ({
+  memory,
+  pet,
+  onPetClick,
+  onFollowToggle,
+  onDelete,
+  onOpenComments,
+}) => {
   const [liked, setLiked] = React.useState(false);
 
   return (
@@ -195,12 +204,35 @@ export const LoviCard: React.FC<LoviCardProps> = ({ memory, pet, onPetClick, onF
           </Pressable>
 
           <Pressable
-            style={({ pressed }) => [styles.shareButton, pressed && styles.pressed]}
+            onPress={() => onOpenComments?.(memory)}
+            style={({ pressed }) => [
+              styles.likeButton,
+              styles.unlikedButton,
+              pressed && styles.pressed,
+            ]}
             accessibilityRole="button"
-            accessibilityLabel="Compartir recuerdo"
+            accessibilityLabel="Ver comentarios"
           >
-            <Ionicons name="share-social-outline" size={15} color={INK_WASH.medium} />
+            <Ionicons
+              name="chatbubble-outline"
+              size={14}
+              color={memory.commentsCount > 0 ? INK_WASH.strong : INK_WASH.medium}
+            />
+            {memory.commentsCount > 0 ? (
+              <Text style={[styles.likeLabel, styles.commentCount]}>{memory.commentsCount}</Text>
+            ) : null}
           </Pressable>
+
+          {memory.isOwn && onDelete ? (
+            <Pressable
+              onPress={() => onDelete(memory)}
+              style={({ pressed }) => [styles.deleteButton, pressed && styles.pressed]}
+              accessibilityRole="button"
+              accessibilityLabel="Eliminar recuerdo"
+            >
+              <Ionicons name="trash-outline" size={14} color={COLORS.fucsia} />
+            </Pressable>
+          ) : null}
         </View>
       </View>
     </View>
@@ -514,6 +546,8 @@ const styles = StyleSheet.create({
   footerActions: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'flex-end',
+    flex: 1,
     gap: 8,
   },
   likeButton: {
@@ -541,9 +575,17 @@ const styles = StyleSheet.create({
   unlikedLabel: {
     color: INK_WASH.medium,
   },
-  shareButton: {
-    padding: 6,
+  commentCount: {
+    color: INK_WASH.strong,
+    fontWeight: '600',
+  },
+  deleteButton: {
+    marginLeft: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.cream,
+    backgroundColor: alpha(COLORS.fucsia, 0.08),
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
