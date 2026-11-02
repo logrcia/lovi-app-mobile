@@ -14,6 +14,7 @@ interface LoviCardProps {
   onFollowToggle?: (petId: string) => void;
   onDelete?: (memory: LoviMemory) => void;
   onOpenComments?: (memory: LoviMemory) => void;
+  onLikeToggle?: (memory: LoviMemory) => void;
 }
 
 const AUDIO_BARS = [
@@ -35,8 +36,11 @@ export const LoviCard: React.FC<LoviCardProps> = ({
   onFollowToggle,
   onDelete,
   onOpenComments,
+  onLikeToggle,
 }) => {
-  const [liked, setLiked] = React.useState(false);
+  // The like lives in the memory row, hydrated once for the feed, so Home and the pet profile
+  // agree without a refetch. The card only renders it and asks for the change.
+  const liked = memory.isLiked;
 
   return (
     <View style={styles.card}>
@@ -183,7 +187,7 @@ export const LoviCard: React.FC<LoviCardProps> = ({
 
         <View style={styles.footerActions}>
           <Pressable
-            onPress={() => setLiked((prev) => !prev)}
+            onPress={() => onLikeToggle?.(memory)}
             style={({ pressed }) => [
               styles.likeButton,
               liked ? styles.likedButton : styles.unlikedButton,

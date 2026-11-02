@@ -21,6 +21,7 @@ import { useLoviData } from './src/lib/hooks/useLoviData';
 import { createAlbum, setMemoryAlbum, type NewAlbumDraft } from './src/lib/repositories/albums';
 import { createAppointment, createVaccine } from './src/lib/repositories/care';
 import { setPetFollowing } from './src/lib/repositories/follows';
+import { setMemoryLiked } from './src/lib/repositories/likes';
 import { createMemory, deleteMemory, type NewMemoryDraft } from './src/lib/repositories/memories';
 import { createPet } from './src/lib/repositories/pets';
 import { AuthScreen } from './src/screens/AuthScreen';
@@ -368,6 +369,36 @@ function AppShell({ profileId }: { profileId: string }) {
   }, []);
 
   /**
+   * The flip lands in the shared `memories` array, so Home and the pet profile show the same
+   * state for the same memory without a refetch. If the write fails, that one memory is
+   * reverted to the value it had before the tap and the error is surfaced.
+   */
+  const handleToggleLike = useCallback(async (memory: LoviMemory) => {
+    const previousValue = memory.isLiked;
+    const nextValue = !previousValue;
+
+    setMemories((previous) =>
+      previous.map((candidate) =>
+        candidate.id === memory.id ? { ...candidate, isLiked: nextValue } : candidate
+      )
+    );
+
+    try {
+      await setMemoryLiked(memory.id, nextValue);
+    } catch (unknownError) {
+      setMemories((previous) =>
+        previous.map((candidate) =>
+          candidate.id === memory.id ? { ...candidate, isLiked: previousValue } : candidate
+        )
+      );
+      Alert.alert(
+        'No pudimos guardar el me gusta',
+        unknownError instanceof Error ? unknownError.message : 'Probá de nuevo.'
+      );
+    }
+  }, []);
+
+  /**
    * Deletes through RLS (the delete policy is the real gate; the card only decides whether to
    * show the button). Local state drops the row immediately, so the feed never waits on a
    * refetch that would only re-read what is already removed.
@@ -414,6 +445,7 @@ function AppShell({ profileId }: { profileId: string }) {
       onOpenUserProfile={openOwnProfile}
       onDelete={handleRequestDelete}
       onOpenComments={handleOpenComments}
+      onLikeToggle={handleToggleLike}
     />
   );
 
@@ -462,6 +494,7 @@ function AppShell({ profileId }: { profileId: string }) {
             onToggleMemoryInAlbum={handleToggleMemoryInAlbum}
             onDelete={handleRequestDelete}
             onOpenComments={handleOpenComments}
+            onLikeToggle={handleToggleLike}
           />
         );
 

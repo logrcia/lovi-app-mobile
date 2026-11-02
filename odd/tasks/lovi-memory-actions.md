@@ -117,3 +117,70 @@ consumer without the card.
 
 Migration application is a manual step: the Supabase CLI is installed but unauthenticated,
 so the SQL has to be applied through the dashboard SQL editor or after `supabase login`.
+
+## Progress
+
+| ID | Status | Evidence |
+| --- | --- | --- |
+| T1 | Done (file only) | `supabase/migrations/20261102180000_memory_comments.sql`, commit `4e8bd4e` |
+| T2 | Done | `Database` types + `DbMemoryComment`, commit `4e8bd4e` |
+| T3 | Done | `src/lib/repositories/comments.ts`, commit `4e8bd4e` |
+| T4 | Done | `deleteMemory` in `memories.ts`, commit `4e8bd4e` |
+| T5 | Done | `isOwn` + `commentsCount` in `types.ts`, `loviData.ts`, `mockData.ts`, commit `4e8bd4e` |
+| T6 | Done | `LoviCard`: share removed, comments added, owner-only delete, commit `e530a89` |
+| T7 | Done | `src/components/ConfirmModal.tsx`, commit `e530a89` |
+| T8 | Done | `src/components/MemoryCommentsModal.tsx`, commit `e530a89` |
+| T9 | Done | `App.tsx`, `HomeScreen.tsx`, `PetProfileScreen.tsx`, commit `e530a89` |
+| T10 | Partial | `tsc` exit 0; `expo lint` 0 errors / 14 pre-existing warnings; `expo export -p web` exit 0. Card visuals not verified: the feed needs an authenticated session. |
+
+### Open items
+
+- **Migration not applied to the remote database.** Verified `GET /rest/v1/memory_comments`
+  returns `404 PGRST205` ("Could not find the table"). The feed still loads because the
+  count query is failure-tolerant, but listing and posting comments will fail until the
+  migration runs. Apply `supabase/migrations/20261102180000_memory_comments.sql` through the
+  Supabase SQL editor, or `supabase login` followed by `npx supabase db push`.
+- **Likes are still not persisted.** Deliberately out of scope; `LoviCard` keeps its local
+  `useState` toggle, so a like resets on remount and is not shared between screens.
+- **Card visuals unverified.** Delete affordance, comment count, and both modals need a
+  logged-in pass in the deployed app.
+
+## Scope addition — persisted likes (authorized after first delivery)
+
+The user confirmed likes must survive reloads. This replaces the local `useState` toggle with
+a real per-user record, and makes the same memory agree between Home and the pet profile.
+
+In:
+
+- `supabase/migrations/20261102190000_memory_likes.sql` — join table, index, RLS.
+- `src/lib/db/types.ts`, `src/lib/db/session.ts` — table types and row alias.
+- `src/lib/repositories/likes.ts` — read the signed-in user's liked memory ids, set a like.
+- `src/types.ts` — `LoviMemory.isLiked`.
+- `src/lib/repositories/loviData.ts` — hydrate `isLiked` for the current profile.
+- `src/data/mockData.ts` — fixture field.
+- `src/components/LoviCard.tsx` — derive from `memory.isLiked`, emit `onLikeToggle`.
+- `App.tsx`, `src/screens/HomeScreen.tsx`, `src/screens/PetProfileScreen.tsx` — optimistic
+  toggle with rollback on failure.
+
+Out: like counts on the card (the button stays a boolean label), likes on comments, and any
+notification work.
+
+| ID | Task | Status |
+| --- | --- | --- |
+| T11 | `memory_likes` migration: composite PK `(memory_id, user_id)`, cascade FKs, `user_id` index, RLS select/insert/delete | Done — `supabase/migrations/20261102190000_memory_likes.sql` |
+| T12 | `memory_likes` types and `DbMemoryLike` alias | Done |
+| T13 | `src/lib/repositories/likes.ts`: `listLikedMemoryIds`, `setMemoryLiked` | Done |
+| T14 | `LoviMemory.isLiked`, hydrated in `loviData.ts`, fixtures updated | Done |
+| T15 | `LoviCard` uses `memory.isLiked`; `App.tsx` optimistic toggle with rollback | Done |
+
+### Progress — persisted likes
+
+`npx tsc --noEmit` exit 0. `npx expo lint` 0 errors / 14 pre-existing warnings.
+`npx expo export -p web` exit 0.
+
+Deviation from the spec, corrected: the requested index on `memory_id` was redundant with the
+composite primary key's leading column, while the only query we run filters `user_id`. The
+index is now `memory_likes_user_id_idx on (user_id)`.
+
+`memory_likes` is **not applied to the remote database yet**, same as `memory_comments`.
+

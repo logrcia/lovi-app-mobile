@@ -18,6 +18,7 @@ import {
   type DbVaccine,
 } from '../db/session';
 import { APPOINTMENT_TYPE_LABEL, SPECIES_LABEL } from '../labels';
+import { listLikedMemoryIds } from './likes';
 
 export interface LoviData {
   currentUser: UserProfile;
@@ -134,7 +135,7 @@ function toUserProfile(profile: DbProfile | undefined, profileId: string): UserP
  * calendar are all derived here from rows.
  */
 export async function fetchLoviData(profileId: string): Promise<LoviData> {
-  const [petsResult, profilesResult, followsResult, memoriesResult, albumsResult, vaccinesResult, appointmentsResult, commentsResult] =
+  const [petsResult, profilesResult, followsResult, memoriesResult, albumsResult, vaccinesResult, appointmentsResult, commentsResult, likedMemoryIds] =
     await Promise.all([
       supabase.from('pets').select('*').order('name'),
       supabase.from('profiles').select('*'),
@@ -146,6 +147,9 @@ export async function fetchLoviData(profileId: string): Promise<LoviData> {
       // Failure-tolerant on purpose: the comments migration is applied by hand, and the feed
       // must keep loading (with counts at 0) before that table exists.
       supabase.from('memory_comments').select('memory_id'),
+      // Same reason: the likes migration is applied by hand too, and a missing table must
+      // cost every heart, not the whole feed.
+      listLikedMemoryIds(profileId).catch(() => new Set<string>()),
     ]);
 
   const failure =
@@ -234,6 +238,7 @@ export async function fetchLoviData(profileId: string): Promise<LoviData> {
         isRecommendation: !followedPetIds.has(memory.pet_id),
         isOwn: petById.get(memory.pet_id)?.isMine ?? false,
         commentsCount: commentsByMemory.get(memory.id) ?? 0,
+        isLiked: likedMemoryIds.has(memory.id),
       };
     });
 

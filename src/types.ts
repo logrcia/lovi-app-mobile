@@ -48,6 +48,8 @@ export interface LoviMemory {
   /** True when the memory belongs to a pet the signed-in user owns. Gates the delete action. */
   isOwn: boolean;
   commentsCount: number;
+  /** True when the signed-in profile has a row for this memory in `memory_likes`. */
+  isLiked: boolean;
   albumId?: string;
 }
 

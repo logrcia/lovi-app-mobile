@@ -227,6 +227,39 @@ export type Database = {
           },
         ]
       }
+      memory_likes: {
+        Row: {
+          created_at: string
+          memory_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          memory_id: string
+          user_id?: string
+        }
+        Update: {
+          created_at?: string
+          memory_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "memory_likes_memory_id_fkey"
+            columns: ["memory_id"]
+            isOneToOne: false
+            referencedRelation: "memories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "memory_likes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pet_follows: {
         Row: {
           created_at: string

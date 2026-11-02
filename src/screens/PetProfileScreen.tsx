@@ -50,6 +50,7 @@ interface PetProfileScreenProps {
   onToggleMemoryInAlbum: (memoryId: string, addToAlbum: boolean, albumId: string) => Promise<void>;
   onDelete?: (memory: LoviMemory) => void;
   onOpenComments?: (memory: LoviMemory) => void;
+  onLikeToggle?: (memory: LoviMemory) => void;
 }
 
 type TabKey = 'recuerdos' | 'albumes' | 'vacunas' | 'turnos';
@@ -95,6 +96,7 @@ export const PetProfileScreen: React.FC<PetProfileScreenProps> = ({
   onToggleMemoryInAlbum,
   onDelete,
   onOpenComments,
+  onLikeToggle,
 }) => {
   const [activeTab, setActiveTab] = React.useState<TabKey>('recuerdos');
 
@@ -164,6 +166,7 @@ export const PetProfileScreen: React.FC<PetProfileScreenProps> = ({
             onFollowToggle={onFollowToggle}
             onDelete={onDelete}
             onOpenComments={onOpenComments}
+            onLikeToggle={onLikeToggle}
           />
         ))}
       </View>
@@ -366,6 +369,7 @@ export const PetProfileScreen: React.FC<PetProfileScreenProps> = ({
                   onFollowToggle={onFollowToggle}
                   onDelete={onDelete}
                   onOpenComments={onOpenComments}
+                  onLikeToggle={onLikeToggle}
                 />
               ))
             )}

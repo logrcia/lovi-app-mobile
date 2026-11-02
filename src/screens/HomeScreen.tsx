@@ -28,6 +28,7 @@ interface HomeScreenProps {
   onOpenUserProfile: () => void;
   onDelete?: (memory: LoviMemory) => void;
   onOpenComments?: (memory: LoviMemory) => void;
+  onLikeToggle?: (memory: LoviMemory) => void;
 }
 
 /**
@@ -45,6 +46,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onOpenUserProfile,
   onDelete,
   onOpenComments,
+  onLikeToggle,
 }) => {
   const myPets = pets.filter((pet) => pet.isMine);
 
@@ -192,6 +194,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               onFollowToggle={onFollowToggle}
               onDelete={onDelete}
               onOpenComments={onOpenComments}
+              onLikeToggle={onLikeToggle}
             />
           );
         })}
