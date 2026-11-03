@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Platform, StatusBar, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Platform, StatusBar, StyleSheet, View } from 'react-native';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AddPetModal, type NewPetDraft } from './src/components/AddPetModal';
 import { BottomTabBar } from './src/components/BottomTabBar';
 import { ConfirmModal } from './src/components/ConfirmModal';
 import { MemoryCommentsModal } from './src/components/MemoryCommentsModal';
+import { ToastHost } from './src/components/ToastHost';
 import {
   CURRENT_USER,
   INITIAL_ALBUMS,
@@ -17,6 +18,7 @@ import {
 } from './src/data/mockData';
 import { signOut } from './src/lib/auth/actions';
 import { useSession } from './src/lib/auth/useSession';
+import { showMessage } from './src/lib/feedback';
 import { useLoviData } from './src/lib/hooks/useLoviData';
 import { createAlbum, setMemoryAlbum, type NewAlbumDraft } from './src/lib/repositories/albums';
 import { createAppointment, createVaccine } from './src/lib/repositories/care';
@@ -247,7 +249,7 @@ function AppShell({ profileId }: { profileId: string }) {
       try {
         await setPetFollowing({ petId, followerId: profileId, following });
       } catch (unknownError) {
-        Alert.alert(
+        showMessage(
           'No pudimos actualizar el seguimiento',
           unknownError instanceof Error ? unknownError.message : 'Probá de nuevo.'
         );
@@ -403,7 +405,7 @@ function AppShell({ profileId }: { profileId: string }) {
             : candidate
         )
       );
-      Alert.alert(
+      showMessage(
         'No pudimos guardar el me gusta',
         unknownError instanceof Error ? unknownError.message : 'Probá de nuevo.'
       );
@@ -425,7 +427,7 @@ function AppShell({ profileId }: { profileId: string }) {
       setMemoryToDelete(null);
     } catch (unknownError) {
       setMemoryToDelete(null);
-      Alert.alert(
+      showMessage(
         'No pudimos eliminar el recuerdo',
         unknownError instanceof Error ? unknownError.message : 'Probá de nuevo.'
       );
@@ -633,7 +635,10 @@ export default function App() {
 
   return (
     <View style={styles.webViewport}>
-      <View style={styles.webFrame}>{app}</View>
+      <View style={styles.webFrame}>
+        {app}
+        <ToastHost />
+      </View>
     </View>
   );
 }

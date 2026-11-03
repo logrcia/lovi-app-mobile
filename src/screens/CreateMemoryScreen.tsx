@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
   Pressable,
   ScrollView,
@@ -16,6 +15,7 @@ import * as ImagePicker from 'expo-image-picker';
 
 import { AspectImage } from '../components/AspectImage';
 import { Sticker } from '../components/Sticker';
+import { showMessage } from '../lib/feedback';
 import { normalizePickedImage } from '../lib/media/normalizeImage';
 import type { NewMemoryDraft } from '../lib/repositories/memories';
 import {
@@ -108,7 +108,7 @@ export const CreateMemoryScreen: React.FC<CreateMemoryScreenProps> = ({
       });
       setMedia(normalized);
     } catch (unknownError) {
-      Alert.alert(
+      showMessage(
         'No pudimos usar esa foto',
         unknownError instanceof Error ? unknownError.message : 'Probá con otra.'
       );
@@ -118,7 +118,7 @@ export const CreateMemoryScreen: React.FC<CreateMemoryScreenProps> = ({
   const pickFromLibrary = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert('Permiso de fotos', 'Necesitamos permiso para acceder a tus fotos.');
+      showMessage('Permiso de fotos', 'Necesitamos permiso para acceder a tus fotos.');
       return;
     }
 
@@ -134,7 +134,7 @@ export const CreateMemoryScreen: React.FC<CreateMemoryScreenProps> = ({
   const pickFromCamera = async () => {
     const permission = await ImagePicker.requestCameraPermissionsAsync();
     if (!permission.granted) {
-      Alert.alert('Permiso de cámara', 'Necesitamos permiso para usar la cámara.');
+      showMessage('Permiso de cámara', 'Necesitamos permiso para usar la cámara.');
       return;
     }
 
@@ -151,7 +151,7 @@ export const CreateMemoryScreen: React.FC<CreateMemoryScreenProps> = ({
     if (saving) return;
 
     if (mediaType === 'image' && !media) {
-      Alert.alert('Falta la foto', 'Elegí una foto para este recuerdo, o cambiá a «Solo texto».');
+      showMessage('Falta la foto', 'Elegí una foto para este recuerdo, o cambiá a «Solo texto».');
       return;
     }
 
@@ -166,7 +166,7 @@ export const CreateMemoryScreen: React.FC<CreateMemoryScreenProps> = ({
         mediaMimeType: media?.mimeType ?? null,
       });
     } catch (unknownError) {
-      Alert.alert(
+      showMessage(
         'No pudimos guardar el recuerdo',
         unknownError instanceof Error ? unknownError.message : 'Probá de nuevo.'
       );

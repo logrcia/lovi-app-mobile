@@ -1,7 +1,8 @@
 import React from 'react';
-import { Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
+import { showMessage } from '../lib/feedback';
 import { alpha, COLORS, FONTS, INK_WASH, RADIUS, SHADOWS } from '../theme';
 import type { Appointment, Pet } from '../types';
 import { AppModal } from './AppModal';
@@ -108,7 +109,7 @@ export const ScheduleAppointmentModal: React.FC<ScheduleAppointmentModalProps> =
       });
       onClose();
     } catch (unknownError) {
-      Alert.alert(
+      showMessage(
         'No pudimos agendar el turno',
         unknownError instanceof Error ? unknownError.message : 'Probá de nuevo.'
       );
