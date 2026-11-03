@@ -14,13 +14,16 @@ import * as ImagePicker from 'expo-image-picker';
 import { normalizePickedImage } from '../lib/media/normalizeImage';
 import { formatAge, parseBirthday } from '../lib/pets/age';
 import { alpha, COLORS, FONTS, INK_WASH, RADIUS, SHADOWS } from '../theme';
-import type { Pet } from '../types';
+import type { LoviImage, Pet } from '../types';
 import { AppModal } from './AppModal';
 
 /** What the sheet hands over: the display pet plus the local file to upload. */
-export interface NewPetDraft extends Omit<Pet, 'id' | 'followersCount' | 'isMine' | 'owner'> {
-  /** `YYYY-MM-DD` typed by the owner, or `null` when they do not know it. */
-  birthday: string | null;
+export interface NewPetDraft
+  extends Omit<Pet, 'id' | 'followersCount' | 'isMine' | 'owner' | 'avatar'> {
+  /** `YYYY-MM-DD` typed by the owner. Required: the form will not submit without it. */
+  birthday: string;
+  /** The pet's current avatar when editing, or the chosen one when creating. */
+  avatar?: LoviImage;
   /** Local `file://` uri chosen with the picker; uploaded once the row exists. */
   avatarLocalUri?: string;
   avatarMimeType?: string | null;
@@ -28,6 +31,8 @@ export interface NewPetDraft extends Omit<Pet, 'id' | 'followersCount' | 'isMine
 
 interface AddPetModalProps {
   isOpen: boolean;
+  /** When present the sheet edits that pet instead of creating a new one. */
+  pet?: Pet | null;
   onClose: () => void;
   onSavePet: (pet: NewPetDraft) => Promise<void>;
 }
@@ -104,11 +109,16 @@ interface PickedPhoto {
 }
 
 /**
- * "Agregar nueva mascota" — name, species, birth date, personality and a photo taken from the
- * device. The photo is uploaded after the row exists; the sheet stays open and reports the
- * error if that fails, so nothing is ever saved half-way.
+ * "Agregar nueva mascota" and "Editar mascota" in one sheet: with a `pet` it edits those fields,
+ * without one it creates a new pet. The photo is uploaded after the row exists; the sheet stays
+ * open and reports the error if that fails, so nothing is ever saved half-way.
  */
-export const AddPetModal: React.FC<AddPetModalProps> = ({ isOpen, onClose, onSavePet }) => {
+export const AddPetModal: React.FC<AddPetModalProps> = ({
+  isOpen,
+  pet = null,
+  onClose,
+  onSavePet,
+}) => {
   const [name, setName] = React.useState('');
   const [species, setSpecies] = React.useState<Pet['species']>('perro');
   const [birthday, setBirthday] = React.useState('');
@@ -117,19 +127,25 @@ export const AddPetModal: React.FC<AddPetModalProps> = ({ isOpen, onClose, onSav
   const [saving, setSaving] = React.useState(false);
   const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
+  const isEditing = Boolean(pet);
+
+  // One effect for both modes: it prefills from the pet being edited, or resets to the blanks
+  // that creating needs. `pet` is in the deps because the parent can open the sheet on a
+  // different pet without closing it first.
   React.useEffect(() => {
     if (!isOpen) return;
 
-    setName('');
-    setSpecies('perro');
-    setBirthday('');
-    setBio('');
+    setName(pet?.name ?? '');
+    setSpecies(pet?.species ?? 'perro');
+    setBirthday(pet?.birthday ?? '');
+    setBio(pet?.bio ?? '');
     setPhoto(null);
     setSaving(false);
     setErrorMessage(null);
-  }, [isOpen]);
+  }, [isOpen, pet]);
 
   const canSave = name.trim().length > 0 && !saving;
+  const submitLabel = isEditing ? 'Guardar cambios' : 'Guardar mascota';
 
   const acceptAsset = async (asset: ImagePicker.ImagePickerAsset | undefined) => {
     if (!asset) return;
@@ -198,16 +214,23 @@ export const AddPetModal: React.FC<AddPetModalProps> = ({ isOpen, onClose, onSav
     }
 
     const trimmedBirthday = birthday.trim();
-    const parsedBirthday = trimmedBirthday ? parseBirthday(trimmedBirthday) : null;
 
-    if (trimmedBirthday && !parsedBirthday) {
+    if (!trimmedBirthday) {
+      setErrorMessage('La fecha de nacimiento es obligatoria.');
+      return;
+    }
+
+    const parsedBirthday = parseBirthday(trimmedBirthday);
+
+    if (!parsedBirthday) {
       setErrorMessage(
         'La fecha de nacimiento tiene que ser una fecha real en formato año-mes-día, por ejemplo 2019-05-14.'
       );
       return;
     }
 
-    if (!photo) {
+    // Only creating needs a photo: editing keeps the current avatar unless a new file is picked.
+    if (!isEditing && !photo) {
       setErrorMessage('Elegí una foto para la mascota.');
       return;
     }
@@ -220,9 +243,8 @@ export const AddPetModal: React.FC<AddPetModalProps> = ({ isOpen, onClose, onSav
         age: formatAge(parsedBirthday),
         birthday: parsedBirthday,
         bio: bio.trim() || 'Compañero/a inseparable de cuatro patas en Lovi.',
-        avatar: { uri: photo.uri },
-        avatarLocalUri: photo.uri,
-        avatarMimeType: photo.mimeType,
+        avatar: photo ? { uri: photo.uri } : pet?.avatar,
+        ...(photo ? { avatarLocalUri: photo.uri, avatarMimeType: photo.mimeType } : {}),
       });
       onClose();
     } catch (unknownError) {
@@ -240,9 +262,11 @@ export const AddPetModal: React.FC<AddPetModalProps> = ({ isOpen, onClose, onSav
     <AppModal
       visible={isOpen}
       onClose={onClose}
-      eyebrow="bienvenida"
-      title="Agregar nueva mascota"
-      description="Sumá a un nuevo integrante a tu familia Lovi"
+      eyebrow={isEditing ? 'editar' : 'bienvenida'}
+      title={isEditing ? 'Editar mascota' : 'Agregar nueva mascota'}
+      description={
+        pet ? `Actualizá los datos de ${pet.name}` : 'Sumá a un nuevo integrante a tu familia Lovi'
+      }
       accent={COLORS.butter}
       footer={
         <>
@@ -255,12 +279,12 @@ export const AddPetModal: React.FC<AddPetModalProps> = ({ isOpen, onClose, onSav
               pressed && styles.pressed,
             ]}
             accessibilityRole="button"
-            accessibilityLabel="Guardar mascota"
+            accessibilityLabel={submitLabel}
           >
             {saving ? (
               <ActivityIndicator color={COLORS.parchment} />
             ) : (
-              <Text style={styles.primaryLabel}>Guardar mascota</Text>
+              <Text style={styles.primaryLabel}>{submitLabel}</Text>
             )}
           </Pressable>
 
@@ -322,6 +346,7 @@ export const AddPetModal: React.FC<AddPetModalProps> = ({ isOpen, onClose, onSav
 
       <Field
         label="Fecha de nacimiento"
+        required
         value={birthday}
         onChangeText={(value) => {
           setBirthday(value);
@@ -329,7 +354,7 @@ export const AddPetModal: React.FC<AddPetModalProps> = ({ isOpen, onClose, onSav
         }}
         placeholder="Ej. 2019-05-14"
         autoCapitalize="none"
-        hint="Si no la sabés, dejalo vacío y no aparecerá en el calendario."
+        hint="Formato año-mes-día, por ejemplo 2019-05-14."
       />
 
       <Field
@@ -341,17 +366,25 @@ export const AddPetModal: React.FC<AddPetModalProps> = ({ isOpen, onClose, onSav
       />
 
       <View style={styles.field}>
-        <Text style={styles.label}>Foto de perfil *</Text>
+        <Text style={styles.label}>{isEditing ? 'Foto de perfil' : 'Foto de perfil *'}</Text>
 
-        {photo ? (
+        {photo || isEditing ? (
           <View style={styles.photoRow}>
             <View style={styles.photoPreviewWrap}>
-              <Image source={{ uri: photo.uri }} style={styles.photoPreview} resizeMode="cover" />
+              <Image
+                source={photo ? { uri: photo.uri } : pet?.avatar}
+                style={styles.photoPreview}
+                resizeMode="cover"
+              />
             </View>
 
             <View style={styles.photoActions}>
-              <Text style={styles.photoTitle}>Tu foto</Text>
-              <Text style={styles.caption}>Se sube al guardar la mascota.</Text>
+              <Text style={styles.photoTitle}>{photo ? 'Tu foto' : 'Foto actual'}</Text>
+              <Text style={styles.caption}>
+                {photo
+                  ? 'Se sube al guardar la mascota.'
+                  : 'Elegí una nueva solo si querés reemplazarla.'}
+              </Text>
 
               <View style={styles.photoLinks}>
                 <Pressable
@@ -361,13 +394,15 @@ export const AddPetModal: React.FC<AddPetModalProps> = ({ isOpen, onClose, onSav
                 >
                   <Text style={styles.linkLabel}>Cambiar</Text>
                 </Pressable>
-                <Pressable
-                  onPress={() => setPhoto(null)}
-                  accessibilityRole="button"
-                  accessibilityLabel="Quitar foto"
-                >
-                  <Text style={styles.linkMuted}>Quitar</Text>
-                </Pressable>
+                {!isEditing ? (
+                  <Pressable
+                    onPress={() => setPhoto(null)}
+                    accessibilityRole="button"
+                    accessibilityLabel="Quitar foto"
+                  >
+                    <Text style={styles.linkMuted}>Quitar</Text>
+                  </Pressable>
+                ) : null}
               </View>
             </View>
           </View>

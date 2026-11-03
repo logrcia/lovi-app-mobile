@@ -13,11 +13,30 @@ export interface CreatePetInput {
   ownerId: string;
   name: string;
   species: Pet['species'];
-  /** `YYYY-MM-DD` typed by the owner, or `null` when they do not know it. */
-  birthday: string | null;
+  /** `YYYY-MM-DD`. Required: the form will not submit without it. */
+  birthday: string;
   bio: string;
   avatar?: PetAvatarSource | null;
 }
+
+export interface UpdatePetInput {
+  petId: string;
+  name: string;
+  species: Pet['species'];
+  /** `YYYY-MM-DD`. Required: the form will not submit without it. */
+  birthday: string;
+  bio: string;
+  /** Only present when the owner picked a new file; the existing avatar stays otherwise. */
+  avatar?: PetAvatarSource | null;
+}
+
+/** Which sentence the permission error uses, since create and update fail the same way. */
+type PetWriteAction = 'create' | 'update';
+
+const PERMISSION_VERB: Record<PetWriteAction, string> = {
+  create: 'crear',
+  update: 'editar',
+};
 
 const EXTENSION_BY_TYPE: Record<string, string> = {
   'image/jpeg': 'jpg',
@@ -26,11 +45,11 @@ const EXTENSION_BY_TYPE: Record<string, string> = {
 };
 
 /** The bucket speaks English and the app speaks Spanish; every failure surfaces in Spanish. */
-function readableError(message: string): string {
+function readableError(message: string, action: PetWriteAction): string {
   const normalized = message.toLowerCase();
 
   if (normalized.includes('row-level security')) {
-    return 'Tu sesión no tiene permiso para crear esta mascota.';
+    return `Tu sesión no tiene permiso para ${PERMISSION_VERB[action]} esta mascota.`;
   }
   if (normalized.includes('exceeded the maximum allowed size') || normalized.includes('too large')) {
     return 'La foto es demasiado grande. Probá con otra.';
@@ -62,12 +81,12 @@ export async function createPet(input: CreatePetInput): Promise<string> {
     .select('id')
     .single();
 
-  if (error) throw new Error(readableError(error.message));
+  if (error) throw new Error(readableError(error.message, 'create'));
 
   if (!input.avatar) return data.id;
 
   try {
-    await attachPetAvatar(data.id, input.avatar);
+    await attachPetAvatar(data.id, input.avatar, 'create');
   } catch (uploadError) {
     const { error: rollbackError } = await supabase.from('pets').delete().eq('id', data.id);
 
@@ -84,7 +103,37 @@ export async function createPet(input: CreatePetInput): Promise<string> {
   return data.id;
 }
 
-async function attachPetAvatar(petId: string, avatar: PetAvatarSource): Promise<void> {
+/**
+ * Updates an owned pet and, when a new photo was picked, replaces `{pet_id}/avatar.{ext}`.
+ *
+ * The upload goes first: `attachPetAvatar` upserts `{pet_id}/avatar.{ext}` and writes
+ * `avatar_path`, so a failed upload leaves the pet on its old photo. Picking a file with a
+ * different extension writes a new path and leaves the previous object orphaned; that is a rare
+ * leftover, not worth an extra delete, because the app only ever produces jpg, png or webp.
+ */
+export async function updatePet(input: UpdatePetInput): Promise<void> {
+  if (input.avatar) {
+    await attachPetAvatar(input.petId, input.avatar, 'update');
+  }
+
+  const { error } = await supabase
+    .from('pets')
+    .update({
+      name: input.name,
+      species: SPECIES_DB[input.species],
+      birthday: input.birthday,
+      bio: input.bio,
+    })
+    .eq('id', input.petId);
+
+  if (error) throw new Error(readableError(error.message, 'update'));
+}
+
+async function attachPetAvatar(
+  petId: string,
+  avatar: PetAvatarSource,
+  action: PetWriteAction
+): Promise<void> {
   const contentType = avatar.mimeType ?? 'image/jpeg';
   const extension = EXTENSION_BY_TYPE[contentType] ?? 'jpg';
   const path = `${petId}/avatar.${extension}`;
@@ -103,12 +152,12 @@ async function attachPetAvatar(petId: string, avatar: PetAvatarSource): Promise<
     .from('pet-media')
     .upload(path, bytes, { contentType, upsert: true });
 
-  if (uploadError) throw new Error(readableError(uploadError.message));
+  if (uploadError) throw new Error(readableError(uploadError.message, action));
 
   const { error: updateError } = await supabase
     .from('pets')
     .update({ avatar_path: path })
     .eq('id', petId);
 
-  if (updateError) throw new Error(readableError(updateError.message));
+  if (updateError) throw new Error(readableError(updateError.message, action));
 }

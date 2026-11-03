@@ -10,6 +10,8 @@ export interface Pet {
   name: string;
   species: 'perro' | 'gato' | 'conejo' | 'ave' | 'otro';
   age: string;
+  /** `YYYY-MM-DD`, or `null` for rows created before the date was mandatory. */
+  birthday: string | null;
   followersCount: number;
   bio: string;
   avatar: LoviImage;

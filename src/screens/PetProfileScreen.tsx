@@ -40,6 +40,8 @@ interface PetProfileScreenProps {
   appointments: Appointment[];
   onBack: () => void;
   onFollowToggle: (petId: string) => void;
+  /** Opens the edit sheet. Only reachable for a pet the signed-in user owns. */
+  onEditPet: () => void;
   onOpenCreate: () => void;
   onOpenCalendar: () => void;
   onSelectPet: (petId: string) => void;
@@ -86,6 +88,7 @@ export const PetProfileScreen: React.FC<PetProfileScreenProps> = ({
   appointments,
   onBack,
   onFollowToggle,
+  onEditPet,
   onOpenCreate,
   onOpenCalendar,
   onSelectPet,
@@ -225,18 +228,32 @@ export const PetProfileScreen: React.FC<PetProfileScreenProps> = ({
           </View>
 
           <View style={styles.heroActions}>
-            <Pressable
-              onPress={() => onOpenOwnerProfile(pet.owner)}
-              style={({ pressed }) => [styles.ownerPill, pressed && styles.pressed]}
-              accessibilityRole="button"
-              accessibilityLabel={`Ver perfil de ${pet.owner.name}`}
-            >
-              <Image source={pet.owner.avatar} style={styles.ownerAvatar} />
-              <Text style={styles.ownerLabel}>
-                su dueño <Text style={styles.ownerName}>{pet.owner.name}</Text>
-              </Text>
-              <Ionicons name="chevron-forward" size={14} color={INK_WASH.faint} />
-            </Pressable>
+            <View style={styles.ownerRow}>
+              <Pressable
+                onPress={() => onOpenOwnerProfile(pet.owner)}
+                style={({ pressed }) => [styles.ownerPill, pressed && styles.pressed]}
+                accessibilityRole="button"
+                accessibilityLabel={`Ver perfil de ${pet.owner.name}`}
+              >
+                <Image source={pet.owner.avatar} style={styles.ownerAvatar} />
+                <Text style={styles.ownerLabel}>
+                  su dueño <Text style={styles.ownerName}>{pet.owner.name}</Text>
+                </Text>
+                <Ionicons name="chevron-forward" size={14} color={INK_WASH.faint} />
+              </Pressable>
+
+              {pet.isMine ? (
+                <Pressable
+                  onPress={onEditPet}
+                  style={({ pressed }) => [styles.editPill, pressed && styles.pressed]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Editar el perfil de ${pet.name}`}
+                >
+                  <Ionicons name="create-outline" size={14} color={COLORS.ink} />
+                  <Text style={styles.editPillLabel}>Editar</Text>
+                </Pressable>
+              ) : null}
+            </View>
 
             {!pet.isMine ? (
               <Pressable
@@ -830,6 +847,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
   },
+  ownerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   ownerPill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -853,6 +875,23 @@ const styles = StyleSheet.create({
     color: INK_WASH.medium,
   },
   ownerName: {
+    fontWeight: '600',
+    color: COLORS.ink,
+  },
+  editPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: RADIUS.pill,
+    backgroundColor: COLORS.parchment,
+    ...MICRO_SHADOW,
+  },
+  editPillLabel: {
+    fontFamily: FONTS.sans,
+    fontSize: 12,
+    lineHeight: 16,
     fontWeight: '600',
     color: COLORS.ink,
   },

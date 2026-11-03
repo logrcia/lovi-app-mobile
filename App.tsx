@@ -25,7 +25,7 @@ import { createAppointment, createVaccine } from './src/lib/repositories/care';
 import { setPetFollowing } from './src/lib/repositories/follows';
 import { setMemoryLiked } from './src/lib/repositories/likes';
 import { createMemory, deleteMemory, type NewMemoryDraft } from './src/lib/repositories/memories';
-import { createPet } from './src/lib/repositories/pets';
+import { createPet, updatePet } from './src/lib/repositories/pets';
 import { AuthScreen } from './src/screens/AuthScreen';
 import { NoPetsScreen } from './src/screens/NoPetsScreen';
 import { CalendarScreen } from './src/screens/CalendarScreen';
@@ -109,6 +109,8 @@ function AppShell({ profileId }: { profileId: string }) {
   const [userProfileReturn, setUserProfileReturn] = useState<ScreenType>('petProfile');
   const [petProfileReturn, setPetProfileReturn] = useState<MainTab>('home');
   const [isAddPetModalOpen, setIsAddPetModalOpen] = useState(false);
+  /** The pet being edited; the same sheet creates when it is `null`. */
+  const [petToEdit, setPetToEdit] = useState<Pet | null>(null);
   const [memoryToDelete, setMemoryToDelete] = useState<LoviMemory | null>(null);
   const [isDeletingMemory, setIsDeletingMemory] = useState(false);
   const [commentsMemory, setCommentsMemory] = useState<LoviMemory | null>(null);
@@ -324,6 +326,9 @@ function AppShell({ profileId }: { profileId: string }) {
           id: petId,
           followersCount: 0,
           isMine: true,
+          // Creating always picks a file, but the field is optional in the draft so both modes
+          // share one type; falling back to the signed-in avatar keeps the row complete.
+          avatar: draft.avatar ?? currentUser.avatar,
           owner: {
             id: currentUser.id,
             name: currentUser.name,
@@ -338,6 +343,45 @@ function AppShell({ profileId }: { profileId: string }) {
       remote.refetch();
     },
     [currentUser, remote.refetch]
+  );
+
+  const handleUpdatePet = useCallback(
+    async (draft: NewPetDraft) => {
+      const pet = petToEdit;
+      if (!pet) return;
+
+      await updatePet({
+        petId: pet.id,
+        name: draft.name,
+        species: draft.species,
+        birthday: draft.birthday,
+        bio: draft.bio,
+        avatar: draft.avatarLocalUri
+          ? { uri: draft.avatarLocalUri, mimeType: draft.avatarMimeType ?? null }
+          : null,
+      });
+
+      // Optimistic row so the profile shows the new data immediately. The avatar only moves when
+      // a new file was uploaded: without one the row keeps the URL refetch would return anyway.
+      setPets((prev) =>
+        prev.map((candidate) =>
+          candidate.id === pet.id
+            ? {
+                ...candidate,
+                name: draft.name,
+                species: draft.species,
+                age: draft.age,
+                birthday: draft.birthday,
+                bio: draft.bio,
+                avatar: draft.avatarLocalUri ? draft.avatar ?? candidate.avatar : candidate.avatar,
+              }
+            : candidate
+        )
+      );
+
+      remote.refetch();
+    },
+    [petToEdit, remote.refetch]
   );
 
   const handleSaveAppointment = useCallback(
@@ -531,6 +575,10 @@ function AppShell({ profileId }: { profileId: string }) {
             appointments={appointments}
             onBack={() => setScreen(petProfileReturn)}
             onFollowToggle={handleFollowToggle}
+            onEditPet={() => {
+              if (!currentPet?.isMine) return;
+              setPetToEdit(currentPet ?? null);
+            }}
             onOpenCreate={openCreateMemory}
             onOpenCalendar={() => setScreen('calendar')}
             onSelectPet={openPetProfile}
@@ -598,9 +646,13 @@ function AppShell({ profileId }: { profileId: string }) {
       />
 
       <AddPetModal
-        isOpen={isAddPetModalOpen}
-        onClose={() => setIsAddPetModalOpen(false)}
-        onSavePet={handleAddPet}
+        isOpen={isAddPetModalOpen || petToEdit !== null}
+        pet={petToEdit}
+        onClose={() => {
+          setIsAddPetModalOpen(false);
+          setPetToEdit(null);
+        }}
+        onSavePet={petToEdit ? handleUpdatePet : handleAddPet}
       />
 
       <ConfirmModal

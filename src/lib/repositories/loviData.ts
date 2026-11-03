@@ -190,6 +190,7 @@ export async function fetchLoviData(profileId: string): Promise<LoviData> {
       name: pet.name,
       species: SPECIES_LABEL[pet.species],
       age: formatAge(pet.birthday),
+      birthday: pet.birthday,
       followersCount: followersByPet.get(pet.id) ?? 0,
       bio: pet.bio,
       avatar: toImage(pet.avatar_path),
