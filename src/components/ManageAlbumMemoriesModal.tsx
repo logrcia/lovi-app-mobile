@@ -25,7 +25,7 @@ interface MemoryThumbProps {
 
 /** Cover thumbnail for image memories, tinted icon tile for audio / video / text ones. */
 const MemoryThumb: React.FC<MemoryThumbProps> = ({ memory, tone }) => {
-  if (memory.mediaUrl) {
+  if (memory.mediaType === 'image' && memory.mediaUrl) {
     return <Image source={memory.mediaUrl} style={styles.thumb} />;
   }
 

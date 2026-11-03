@@ -1,5 +1,6 @@
 import type { MediaType } from '../../types';
 import { supabase } from '../db/client';
+import { EXTENSION_BY_MIME_TYPE } from '../media/memoryMedia';
 import { readLocalAssetBytes } from '../media/readAssetBytes';
 
 export interface NewMemoryDraft {
@@ -10,26 +11,40 @@ export interface NewMemoryDraft {
   /** Local `file://` uri; required for everything except a text-only memory. */
   mediaLocalUri?: string;
   mediaMimeType?: string | null;
+  /** Length of a video or audio memory, in whole seconds. */
+  mediaDurationSeconds?: number | null;
 }
 
-const EXTENSION_BY_TYPE: Record<string, string> = {
-  'image/jpeg': 'jpg',
-  'image/png': 'png',
-  'image/webp': 'webp',
+/** What the file is called in user-facing errors, per format. */
+const MEDIA_NOUN: Record<MediaType, string> = {
+  image: 'la foto',
+  video: 'el video',
+  audio: 'el audio',
+  text: 'el archivo',
+};
+
+const DEFAULT_MIME_TYPE: Record<MediaType, string> = {
+  image: 'image/jpeg',
+  video: 'video/mp4',
+  audio: 'audio/mp4',
+  text: 'application/octet-stream',
 };
 
 /** Supabase speaks English; the composer speaks Spanish. */
-function readableError(message: string): string {
+function readableError(message: string, mediaType: MediaType = 'image'): string {
+  const noun = MEDIA_NOUN[mediaType];
   const normalized = message.toLowerCase();
 
   if (normalized.includes('row-level security')) {
     return 'Ese recuerdo no se puede guardar en esa mascota.';
   }
   if (normalized.includes('exceeded the maximum allowed size') || normalized.includes('too large')) {
-    return 'La foto es demasiado grande. Probá con otra.';
+    return `${capitalize(noun)} pesa más de 50 MB. Probá con un archivo más liviano.`;
   }
   if (normalized.includes('mime type') || normalized.includes('not supported')) {
-    return 'Ese formato de foto no está soportado. Probá con JPG o PNG.';
+    return mediaType === 'image'
+      ? 'Ese formato de foto no está soportado. Probá con JPG o PNG.'
+      : `Ese formato no está soportado para ${noun}.`;
   }
   if (normalized.includes('media_presence')) {
     return 'Ese formato necesita un archivo y todavía no lo tenemos.';
@@ -38,8 +53,10 @@ function readableError(message: string): string {
   return message;
 }
 
+const capitalize = (value: string) => value.charAt(0).toUpperCase() + value.slice(1);
+
 function buildMediaPath(petId: string, contentType: string): string {
-  const extension = EXTENSION_BY_TYPE[contentType] ?? 'jpg';
+  const extension = EXTENSION_BY_MIME_TYPE[contentType] ?? 'bin';
   const suffix = Math.random().toString(36).slice(2, 8);
   return `${petId}/memories/${Date.now()}-${suffix}.${extension}`;
 }
@@ -56,10 +73,10 @@ export async function createMemory(draft: NewMemoryDraft): Promise<string> {
   }
 
   if (!draft.mediaLocalUri) {
-    throw new Error('Ese recuerdo necesita una foto.');
+    throw new Error(`Ese recuerdo necesita ${MEDIA_NOUN[draft.mediaType]}.`);
   }
 
-  const contentType = draft.mediaMimeType ?? 'image/jpeg';
+  const contentType = draft.mediaMimeType ?? DEFAULT_MIME_TYPE[draft.mediaType];
   const path = buildMediaPath(draft.petId, contentType);
 
   // Expo's fetch rejects `{ uri }` FormData parts, so the bytes are read directly.
@@ -67,14 +84,14 @@ export async function createMemory(draft: NewMemoryDraft): Promise<string> {
   try {
     bytes = await readLocalAssetBytes(draft.mediaLocalUri);
   } catch {
-    throw new Error('No pudimos leer la foto. Probá con otra.');
+    throw new Error(`No pudimos leer ${MEDIA_NOUN[draft.mediaType]}. Probá con otro archivo.`);
   }
 
   const { error: uploadError } = await supabase.storage
     .from('pet-media')
     .upload(path, bytes, { contentType, upsert: false });
 
-  if (uploadError) throw new Error(readableError(uploadError.message));
+  if (uploadError) throw new Error(readableError(uploadError.message, draft.mediaType));
 
   try {
     return await insertMemory(draft, path);
@@ -93,11 +110,15 @@ async function insertMemory(draft: NewMemoryDraft, mediaPath: string | null): Pr
       description: draft.description ?? null,
       media_type: draft.mediaType,
       media_path: mediaPath,
+      media_duration_seconds:
+        draft.mediaType === 'video' || draft.mediaType === 'audio'
+          ? (draft.mediaDurationSeconds ?? null)
+          : null,
     })
     .select('id')
     .single();
 
-  if (error) throw new Error(readableError(error.message));
+  if (error) throw new Error(readableError(error.message, draft.mediaType));
 
   return data.id;
 }

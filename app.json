@@ -25,8 +25,17 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Lovi usa tus fotos para elegir el retrato de tus mascotas.",
-          "cameraPermission": "Lovi usa la cámara para sacarle una foto a tus mascotas."
+          "photosPermission": "Lovi usa tus fotos y videos para los recuerdos y retratos de tus mascotas.",
+          "cameraPermission": "Lovi usa la cámara para sacarle fotos y videos a tus mascotas.",
+          "microphonePermission": "Lovi usa el micrófono para grabar notas de audio y el sonido de los videos de tus mascotas."
+        }
+      ],
+      "expo-video",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Lovi usa el micrófono para grabar notas de audio y el sonido de los videos de tus mascotas.",
+          "enableBackgroundPlayback": false
         }
       ]
     ]
