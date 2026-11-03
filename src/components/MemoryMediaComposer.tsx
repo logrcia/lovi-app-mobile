@@ -12,6 +12,7 @@ import {
   useAudioRecorder,
   useAudioRecorderState,
 } from 'expo-audio';
+import { useEventListener } from 'expo';
 import { useVideoPlayer, VideoView } from 'expo-video';
 
 import { showMessage } from '../lib/feedback';
@@ -169,11 +170,18 @@ const VideoPreview: React.FC<{ uri: string }> = ({ uri }) => {
     instance.loop = false;
   });
 
+  // Back to the first frame when the clip ends, so the next play starts over instead of
+  // sitting on the last frame.
+  useEventListener(player, 'playToEnd', () => {
+    player.pause();
+    player.currentTime = 0;
+  });
+
   return (
     <View style={styles.videoFrame}>
       <VideoView
         player={player}
-        style={StyleSheet.absoluteFill}
+        style={styles.videoFill}
         contentFit="contain"
         nativeControls
         accessibilityLabel="Video elegido para el recuerdo"
@@ -541,6 +549,18 @@ const styles = StyleSheet.create({
   },
 
   /* Video */
+  /**
+   * On web the view is a bare `<video>` element: offsets alone leave it at the clip's intrinsic
+   * size (e.g. 1920 px wide), so the frame crops it to a zoomed-in corner. Explicit 100% sizes
+   * make it fit the frame on every platform.
+   */
+  videoFill: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+  },
   videoFrame: {
     width: '100%',
     aspectRatio: 4 / 3,
