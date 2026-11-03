@@ -20,6 +20,7 @@ import { signOut } from './src/lib/auth/actions';
 import { useSession } from './src/lib/auth/useSession';
 import { showMessage } from './src/lib/feedback';
 import { useLoviData } from './src/lib/hooks/useLoviData';
+import { useUnreadNotifications } from './src/lib/hooks/useUnreadNotifications';
 import { createAlbum, setMemoryAlbum, type NewAlbumDraft } from './src/lib/repositories/albums';
 import { createAppointment, createVaccine } from './src/lib/repositories/care';
 import { setPetFollowing } from './src/lib/repositories/follows';
@@ -32,6 +33,7 @@ import { CalendarScreen } from './src/screens/CalendarScreen';
 import { CreateMemoryScreen } from './src/screens/CreateMemoryScreen';
 import { ExploreScreen } from './src/screens/ExploreScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
+import { NotificationsScreen } from './src/screens/NotificationsScreen';
 import { PetProfileScreen } from './src/screens/PetProfileScreen';
 import { UserProfileScreen } from './src/screens/UserProfileScreen';
 import { alpha, COLORS } from './src/theme';
@@ -119,6 +121,7 @@ function AppShell({ profileId }: { profileId: string }) {
   // Starts from the fixtures so the first frame already has the editorial layout, then
   // swaps everything for what Postgres actually holds.
   const remote = useLoviData(profileId);
+  const unread = useUnreadNotifications(profileId);
 
   /**
    * The signed-in profile. `CURRENT_USER` is only the pre-load placeholder for the first
@@ -164,6 +167,13 @@ function AppShell({ profileId }: { profileId: string }) {
     return () => clearInterval(interval);
   }, [screen, refetchLoviData]);
 
+  // Coming back to the feed is when the bell is in view again, so re-count right then instead
+  // of waiting for the next tick.
+  const refreshUnread = unread.refresh;
+  useEffect(() => {
+    if (screen === 'home') refreshUnread();
+  }, [screen, refreshUnread]);
+
   const currentPet = useMemo(
     () => pets.find((pet) => pet.id === selectedPetId) ?? pets.find((pet) => pet.isMine),
     [pets, selectedPetId]
@@ -188,11 +198,14 @@ function AppShell({ profileId }: { profileId: string }) {
   // pet profile -> the tab it came from.
   const activeTab: MainTab | null = (() => {
     if (screen === 'createMemory') return null;
+    // The inbox is opened from the feed's bell, so the feed stays lit.
+    if (screen === 'notifications') return 'home';
     if (screen === 'petProfile') return petProfileReturn;
 
     if (screen === 'userProfile' && viewedUser.id !== currentUser.id) {
       if (userProfileReturn === 'petProfile') return petProfileReturn;
       if (userProfileReturn === 'createMemory') return null;
+      if (userProfileReturn === 'notifications') return 'home';
       return userProfileReturn;
     }
 
@@ -204,7 +217,9 @@ function AppShell({ profileId }: { profileId: string }) {
     (petId: string) => {
       // A pet profile is reachable from any tab. Remember the tab it was opened from so the
       // dock highlight and the back arrow both return there instead of guessing "Mi perfil".
-      if (screen !== 'petProfile' && screen !== 'createMemory') {
+      if (screen === 'notifications') {
+        setPetProfileReturn('home');
+      } else if (screen !== 'petProfile' && screen !== 'createMemory') {
         setPetProfileReturn(screen);
       }
 
@@ -248,6 +263,23 @@ function AppShell({ profileId }: { profileId: string }) {
       setScreen(tab);
     },
     [currentUser]
+  );
+
+  const openNotifications = useCallback(() => {
+    setScreen('notifications');
+  }, []);
+
+  /** A comment notification opens that memory's comments; the feed may not hold it any more. */
+  const openCommentsById = useCallback(
+    (memoryId: string) => {
+      const memory = memories.find((candidate) => candidate.id === memoryId);
+      if (memory) {
+        setCommentsMemory(memory);
+      } else {
+        showMessage('Ese recuerdo ya no está', 'Puede que lo hayan eliminado.');
+      }
+    },
+    [memories]
   );
 
   const openCreateMemory = useCallback(() => {
@@ -527,11 +559,11 @@ function AppShell({ profileId }: { profileId: string }) {
       pets={pets}
       memories={memories}
       currentUserName={remote.data?.currentUser.name}
-      currentUserAvatar={remote.data?.currentUser.avatar}
+      unreadNotifications={unread.count}
       onSelectPet={openPetProfile}
       onFollowToggle={handleFollowToggle}
       onOpenCreate={openCreateMemory}
-      onOpenUserProfile={openOwnProfile}
+      onOpenNotifications={openNotifications}
       onDelete={handleRequestDelete}
       onOpenComments={handleOpenComments}
       onLikeToggle={handleToggleLike}
@@ -590,6 +622,25 @@ function AppShell({ profileId }: { profileId: string }) {
             onDelete={handleRequestDelete}
             onOpenComments={handleOpenComments}
             onLikeToggle={handleToggleLike}
+          />
+        );
+
+      case 'notifications':
+        return (
+          <NotificationsScreen
+            profileId={profileId}
+            onBack={() => setScreen('home')}
+            onAllRead={unread.clear}
+            onOpenPet={openPetProfile}
+            onOpenActor={(actor) =>
+              openOwnerProfile({
+                id: actor.id,
+                name: actor.name,
+                handle: actor.handle,
+                avatar: actor.avatarUrl ? { uri: actor.avatarUrl } : currentUser.avatar,
+              })
+            }
+            onOpenComments={openCommentsById}
           />
         );
 
