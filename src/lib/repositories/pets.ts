@@ -13,7 +13,7 @@ export interface CreatePetInput {
   ownerId: string;
   name: string;
   species: Pet['species'];
-  /** `YYYY-MM-DD`, derived from the age text by `parseAgeToBirthday`. */
+  /** `YYYY-MM-DD` typed by the owner, or `null` when they do not know it. */
   birthday: string | null;
   bio: string;
   avatar?: PetAvatarSource | null;

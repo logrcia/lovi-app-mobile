@@ -168,7 +168,17 @@ function AppShell({ profileId }: { profileId: string }) {
   );
 
   const myPets = useMemo(() => pets.filter((pet) => pet.isMine), [pets]);
+  const myPetIds = useMemo(() => new Set(myPets.map((pet) => pet.id)), [myPets]);
   const followingPets = useMemo(() => pets.filter((pet) => pet.isFollowing), [pets]);
+
+  /**
+   * The calendar belongs to the owner: every event whose pet they own, so a second pet's
+   * agenda shows up without navigating to that pet first.
+   */
+  const myCalendarEvents = useMemo(
+    () => calendarEvents.filter((event) => myPetIds.has(event.petId)),
+    [calendarEvents, myPetIds]
+  );
 
   // The dock reflects where the current screen belongs: a pet profile keeps the tab it was
   // opened from lit, and the composer (reachable from the FAB on any tab) belongs to none.
@@ -491,8 +501,10 @@ function AppShell({ profileId }: { profileId: string }) {
       return <NoPetsScreen onGoToProfile={openOwnProfile} />;
     }
 
-    // Calendar and the composer are always about a pet you own, never one from Explore.
-    if ((screen === 'calendar' || screen === 'createMemory') && !currentPet?.isMine) {
+    // The calendar is family-scoped, so owning any pet is enough for it. The composer still
+    // needs one it can write to, so it opens on an owned pet even when Explore left someone
+    // else's pet selected.
+    if ((screen === 'calendar' || screen === 'createMemory') && myPets.length === 0) {
       return <NoPetsScreen onGoToProfile={openOwnProfile} />;
     }
 
@@ -534,12 +546,7 @@ function AppShell({ profileId }: { profileId: string }) {
         );
 
       case 'calendar':
-        return (
-          <CalendarScreen
-            pet={currentPet!}
-            events={calendarEvents.filter((event) => event.petId === currentPet?.id)}
-          />
-        );
+        return <CalendarScreen pets={myPets} events={myCalendarEvents} />;
 
       case 'userProfile':
         return (
@@ -566,7 +573,7 @@ function AppShell({ profileId }: { profileId: string }) {
       case 'createMemory':
         return (
           <CreateMemoryScreen
-            pet={currentPet!}
+            pet={currentPet?.isMine ? currentPet : myPets[0]}
             availablePets={myPets}
             onSave={handleSaveMemory}
             onCancel={() => setScreen('home')}

@@ -1,43 +1,64 @@
 /**
- * The add-pet sheet asks for age as free text ("4 meses", "2 años"), but the database
- * stores `birthday date` and every age label is derived from it. This is the only place
- * that translation happens.
+ * The database stores `birthday date` and every age label is derived from it. This module is
+ * the only place that converts between the stored date and what the UI shows, in both
+ * directions: `YYYY-MM-DD` → `'3 años'` and a typed birth date → `YYYY-MM-DD`.
  */
 
-const AGE_PATTERN = /^\s*(\d{1,3})\s*(días?|dias?|semanas?|mes(?:es)?|años?|anos?)\s*$/i;
+const BIRTHDAY_PATTERN = /^(\d{4})-(\d{2})-(\d{2})$/;
 
 const pad = (value: number) => String(value).padStart(2, '0');
 
-function toDateOnly(date: Date): string {
-  // Local calendar date, not UTC: `toISOString()` would shift the day across timezones.
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+function parseDateOnly(value: string): Date {
+  return new Date(`${value}T00:00:00`);
+}
+
+/** Age is derived from `birthday`; the database never stores "3 años". */
+export function formatAge(birthday: string | null): string {
+  if (!birthday) return '';
+  const born = parseDateOnly(birthday);
+  const now = new Date();
+
+  let months =
+    (now.getFullYear() - born.getFullYear()) * 12 + (now.getMonth() - born.getMonth());
+  if (now.getDate() < born.getDate()) months -= 1;
+  if (months < 0) return '';
+
+  if (months < 12) return months <= 1 ? '1 mes' : `${months} meses`;
+
+  const years = Math.floor(months / 12);
+  return years === 1 ? '1 año' : `${years} años`;
 }
 
 /**
- * `'3 años'` → `'2023-10-28'`.
+ * `'2019-05-14'` → `'2019-05-14'`.
  *
- * Returns `null` when the text is not an age this app understands, so the caller can
- * ask again instead of silently storing a wrong date.
+ * Only the unambiguous `YYYY-MM-DD` form is accepted, so `02/11` and `11/02` can never be read
+ * as each other. Returns `null` when the format does not match, when the components do not form
+ * a real calendar date (`2019-02-30`), or when the date is in the future — the caller asks again
+ * instead of storing an invented birthday.
  */
-export function parseAgeToBirthday(input: string, now: Date = new Date()): string | null {
-  const match = AGE_PATTERN.exec(input);
+export function parseBirthday(input: string, now: Date = new Date()): string | null {
+  const match = BIRTHDAY_PATTERN.exec(input.trim());
   if (!match) return null;
 
-  const amount = Number(match[1]);
-  if (!Number.isFinite(amount) || amount < 0) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
 
-  const unit = match[2].toLowerCase();
-  const birthday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-  if (unit.startsWith('dí') || unit.startsWith('di')) {
-    birthday.setDate(birthday.getDate() - amount);
-  } else if (unit.startsWith('semana')) {
-    birthday.setDate(birthday.getDate() - amount * 7);
-  } else if (unit.startsWith('mes')) {
-    birthday.setMonth(birthday.getMonth() - amount);
-  } else {
-    birthday.setMonth(birthday.getMonth() - amount * 12);
+  // `new Date(2019, 1, 30)` silently rolls over to March 2nd, so the only reliable check is
+  // building the date and reading the numbers back.
+  const parsed = new Date(year, month - 1, day);
+  if (
+    parsed.getFullYear() !== year ||
+    parsed.getMonth() !== month - 1 ||
+    parsed.getDate() !== day
+  ) {
+    return null;
   }
 
-  return toDateOnly(birthday);
+  // Local midnight today: a birthday entered today is valid, tomorrow is not.
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  if (parsed.getTime() > today.getTime()) return null;
+
+  return `${year}-${pad(month)}-${pad(day)}`;
 }

@@ -17,7 +17,8 @@ import {
 import type { CalendarEvent, Pet } from '../types';
 
 interface CalendarScreenProps {
-  pet: Pet;
+  /** Every pet the signed-in owner has; the agenda merges all of their events. */
+  pets: Pet[];
   events: CalendarEvent[];
 }
 
@@ -155,13 +156,26 @@ const buildWeeks = (year: number, month: number): (number | null)[][] => {
   return weeks;
 };
 
-export const CalendarScreen: React.FC<CalendarScreenProps> = ({ pet, events }) => {
+export const CalendarScreen: React.FC<CalendarScreenProps> = ({ pets, events }) => {
   const today = useToday();
   const [cursor, setCursor] = React.useState<MonthCursor>({
     year: today.year,
     month: today.month,
   });
   const [selectedDay, setSelectedDay] = React.useState(today.day);
+
+  const petNameById = React.useMemo(
+    () => new Map(pets.map((pet) => [pet.id, pet.name])),
+    [pets]
+  );
+
+  // One pet keeps the personal title; the shared agenda needs the family name. Zero pets is a
+  // transient state (before the first fetch), not a case worth a sentence of its own.
+  const title = React.useMemo(() => {
+    if (pets.length === 0) return 'Calendario';
+    if (pets.length === 1) return `Calendario de ${pets[0].name}`;
+    return 'Calendario de la familia';
+  }, [pets]);
 
   const monthName = MONTH_NAMES[cursor.month];
   const weeks = React.useMemo(
@@ -213,7 +227,7 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({ pet, events }) =
               <Text style={styles.privatePillText}>Privado del dueño</Text>
             </View>
           </View>
-          <Text style={styles.title}>Calendario de {pet.name}</Text>
+          <Text style={styles.title}>{title}</Text>
         </View>
       </View>
 
@@ -369,6 +383,7 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({ pet, events }) =
           <View style={styles.eventList}>
             {selectedEvents.map((event) => {
               const visual = EVENT_VISUALS[event.type];
+              const petName = petNameById.get(event.petId);
 
               return (
                 <View key={event.id} style={styles.eventCard}>
@@ -387,10 +402,13 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({ pet, events }) =
                           </Text>
                         </View>
                       </View>
-                      {event.time ? (
+                      {petName || event.time || event.description ? (
                         <Text style={styles.eventMeta}>
+                          {petName ? <Text style={styles.eventPet}>{petName}</Text> : null}
+                          {petName && event.time ? ' · ' : null}
                           {event.time}
-                          {event.description ? ` · ${event.description}` : ''}
+                          {(petName || event.time) && event.description ? ' · ' : null}
+                          {event.description}
                         </Text>
                       ) : null}
                     </View>
@@ -697,6 +715,10 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     fontWeight: '500',
     color: alpha(COLORS.ink, 0.6),
+  },
+  eventPet: {
+    color: COLORS.ink,
+    fontWeight: '600',
   },
   emptyCard: {
     ...CARD_SURFACE,

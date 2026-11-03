@@ -18,6 +18,7 @@ import {
   type DbVaccine,
 } from '../db/session';
 import { APPOINTMENT_TYPE_LABEL, SPECIES_LABEL } from '../labels';
+import { formatAge } from '../pets/age';
 import { listLikedMemoryIds } from './likes';
 
 export interface LoviData {
@@ -55,23 +56,6 @@ function formatLongDate(value: string | null): string {
   if (!value) return 'Sin fecha';
   const date = parseDateOnly(value);
   return `${pad(date.getDate())} ${MONTHS_SHORT[date.getMonth()]} ${date.getFullYear()}`;
-}
-
-/** Age is derived from `birthday`; the database never stores "3 años". */
-function formatAge(birthday: string | null): string {
-  if (!birthday) return '';
-  const born = parseDateOnly(birthday);
-  const now = new Date();
-
-  let months =
-    (now.getFullYear() - born.getFullYear()) * 12 + (now.getMonth() - born.getMonth());
-  if (now.getDate() < born.getDate()) months -= 1;
-  if (months < 0) return '';
-
-  if (months < 12) return months <= 1 ? '1 mes' : `${months} meses`;
-
-  const years = Math.floor(months / 12);
-  return years === 1 ? '1 año' : `${years} años`;
 }
 
 /** `happened_at` / `created_at` → `'Hoy · 11:42'`, computed at render time instead of stored. */

@@ -12,15 +12,15 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 
 import { normalizePickedImage } from '../lib/media/normalizeImage';
-import { parseAgeToBirthday } from '../lib/pets/age';
+import { formatAge, parseBirthday } from '../lib/pets/age';
 import { alpha, COLORS, FONTS, INK_WASH, RADIUS, SHADOWS } from '../theme';
 import type { Pet } from '../types';
 import { AppModal } from './AppModal';
 
 /** What the sheet hands over: the display pet plus the local file to upload. */
 export interface NewPetDraft extends Omit<Pet, 'id' | 'followersCount' | 'isMine' | 'owner'> {
-  /** `YYYY-MM-DD`, already parsed from the age text by the sheet. */
-  birthday: string;
+  /** `YYYY-MM-DD` typed by the owner, or `null` when they do not know it. */
+  birthday: string | null;
   /** Local `file://` uri chosen with the picker; uploaded once the row exists. */
   avatarLocalUri?: string;
   avatarMimeType?: string | null;
@@ -46,6 +46,8 @@ interface FieldProps {
   autoFocus?: boolean;
   icon?: IconName;
   autoCapitalize?: 'none' | 'sentences' | 'words' | 'characters';
+  /** Small muted line under the input, for guidance the label cannot carry. */
+  hint?: string;
 }
 
 /** Label + input pair with its own focus tracking, so the hairline turns fucsia on focus. */
@@ -59,6 +61,7 @@ const Field: React.FC<FieldProps> = ({
   autoFocus = false,
   icon,
   autoCapitalize = multiline ? 'sentences' : 'words',
+  hint,
 }) => {
   const [focused, setFocused] = React.useState(false);
 
@@ -89,6 +92,8 @@ const Field: React.FC<FieldProps> = ({
           focused && styles.inputFocused,
         ]}
       />
+
+      {hint ? <Text style={styles.hint}>{hint}</Text> : null}
     </View>
   );
 };
@@ -99,14 +104,14 @@ interface PickedPhoto {
 }
 
 /**
- * "Agregar nueva mascota" — name, species, age, personality and a photo taken from the
+ * "Agregar nueva mascota" — name, species, birth date, personality and a photo taken from the
  * device. The photo is uploaded after the row exists; the sheet stays open and reports the
  * error if that fails, so nothing is ever saved half-way.
  */
 export const AddPetModal: React.FC<AddPetModalProps> = ({ isOpen, onClose, onSavePet }) => {
   const [name, setName] = React.useState('');
   const [species, setSpecies] = React.useState<Pet['species']>('perro');
-  const [age, setAge] = React.useState('');
+  const [birthday, setBirthday] = React.useState('');
   const [bio, setBio] = React.useState('');
   const [photo, setPhoto] = React.useState<PickedPhoto | null>(null);
   const [saving, setSaving] = React.useState(false);
@@ -117,7 +122,7 @@ export const AddPetModal: React.FC<AddPetModalProps> = ({ isOpen, onClose, onSav
 
     setName('');
     setSpecies('perro');
-    setAge('');
+    setBirthday('');
     setBio('');
     setPhoto(null);
     setSaving(false);
@@ -192,9 +197,13 @@ export const AddPetModal: React.FC<AddPetModalProps> = ({ isOpen, onClose, onSav
       return;
     }
 
-    const birthday = parseAgeToBirthday(age);
-    if (!birthday) {
-      setErrorMessage('No entendimos la edad. Probá con "4 meses" o "3 años".');
+    const trimmedBirthday = birthday.trim();
+    const parsedBirthday = trimmedBirthday ? parseBirthday(trimmedBirthday) : null;
+
+    if (trimmedBirthday && !parsedBirthday) {
+      setErrorMessage(
+        'La fecha de nacimiento tiene que ser una fecha real en formato año-mes-día, por ejemplo 2019-05-14.'
+      );
       return;
     }
 
@@ -208,8 +217,8 @@ export const AddPetModal: React.FC<AddPetModalProps> = ({ isOpen, onClose, onSav
       await onSavePet({
         name: name.trim(),
         species,
-        age: age.trim(),
-        birthday,
+        age: formatAge(parsedBirthday),
+        birthday: parsedBirthday,
         bio: bio.trim() || 'Compañero/a inseparable de cuatro patas en Lovi.',
         avatar: { uri: photo.uri },
         avatarLocalUri: photo.uri,
@@ -312,15 +321,15 @@ export const AddPetModal: React.FC<AddPetModalProps> = ({ isOpen, onClose, onSav
       </View>
 
       <Field
-        label="Edad"
-        required
-        value={age}
+        label="Fecha de nacimiento"
+        value={birthday}
         onChangeText={(value) => {
-          setAge(value);
+          setBirthday(value);
           if (errorMessage) setErrorMessage(null);
         }}
-        placeholder="Ej. 4 meses, 2 años, 7 años..."
+        placeholder="Ej. 2019-05-14"
         autoCapitalize="none"
+        hint="Si no la sabés, dejalo vacío y no aparecerá en el calendario."
       />
 
       <Field
@@ -446,6 +455,13 @@ const styles = StyleSheet.create({
     minHeight: 66,
     paddingTop: 10,
     textAlignVertical: 'top',
+  },
+  hint: {
+    fontFamily: FONTS.sans,
+    fontSize: 10,
+    lineHeight: 14,
+    color: INK_WASH.faint,
+    marginTop: 2,
   },
   caption: {
     fontFamily: FONTS.sans,
