@@ -14,6 +14,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 
 import { AspectImage } from '../components/AspectImage';
+import { AudioComposer, VideoComposer } from '../components/MemoryMediaComposer';
+import type { PickedTimedMedia } from '../components/MemoryMediaComposer';
 import { Sticker } from '../components/Sticker';
 import { showMessage } from '../lib/feedback';
 import { normalizePickedImage } from '../lib/media/normalizeImage';
@@ -44,16 +46,20 @@ interface MediaOption {
   type: MediaType;
   label: string;
   icon: IoniconName;
-  /** Video and audio need real capture — until then they are visibly unavailable. */
-  available: boolean;
 }
 
 const MEDIA_OPTIONS: readonly MediaOption[] = [
-  { type: 'image', label: 'Foto', icon: 'camera', available: true },
-  { type: 'video', label: 'Video', icon: 'videocam', available: false },
-  { type: 'audio', label: 'Audio', icon: 'mic', available: false },
-  { type: 'text', label: 'Solo texto', icon: 'book', available: true },
+  { type: 'image', label: 'Foto', icon: 'camera' },
+  { type: 'video', label: 'Video', icon: 'videocam' },
+  { type: 'audio', label: 'Audio', icon: 'mic' },
+  { type: 'text', label: 'Solo texto', icon: 'book' },
 ];
+
+/** Shown when saving a video or audio memory with nothing attached. */
+const MISSING_MEDIA: Record<'video' | 'audio', [string, string]> = {
+  video: ['Falta el video', 'Elegí o grabá un video para este recuerdo, o cambiá a «Solo texto».'],
+  audio: ['Falta el audio', 'Grabá o elegí un audio para este recuerdo, o cambiá a «Solo texto».'],
+};
 
 const FALLBACK_TITLE = 'Recuerdo sin título';
 
@@ -86,7 +92,10 @@ export const CreateMemoryScreen: React.FC<CreateMemoryScreenProps> = ({
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [mediaType, setMediaType] = useState<MediaType>('image');
+  // One slot per format, so switching chips back and forth never loses what was picked.
   const [media, setMedia] = useState<PickedMedia | null>(null);
+  const [video, setVideo] = useState<PickedTimedMedia | null>(null);
+  const [audio, setAudio] = useState<PickedTimedMedia | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
@@ -155,6 +164,15 @@ export const CreateMemoryScreen: React.FC<CreateMemoryScreenProps> = ({
       return;
     }
 
+    const timed = mediaType === 'video' ? video : mediaType === 'audio' ? audio : null;
+    if ((mediaType === 'video' || mediaType === 'audio') && !timed) {
+      const [heading, body] = MISSING_MEDIA[mediaType];
+      showMessage(heading, body);
+      return;
+    }
+
+    const attached = mediaType === 'image' ? media : timed;
+
     setSaving(true);
     try {
       await onSave({
@@ -162,8 +180,9 @@ export const CreateMemoryScreen: React.FC<CreateMemoryScreenProps> = ({
         title: trimmedTitle || FALLBACK_TITLE,
         description: description.trim() || undefined,
         mediaType,
-        mediaLocalUri: media?.uri,
-        mediaMimeType: media?.mimeType ?? null,
+        mediaLocalUri: mediaType === 'text' ? undefined : attached?.uri,
+        mediaMimeType: mediaType === 'text' ? null : (attached?.mimeType ?? null),
+        mediaDurationSeconds: timed?.durationSeconds ?? null,
       });
     } catch (unknownError) {
       showMessage(
@@ -260,25 +279,22 @@ export const CreateMemoryScreen: React.FC<CreateMemoryScreenProps> = ({
         <View>
           <Text style={styles.label}>Formato del recuerdo</Text>
           <View style={styles.mediaRow}>
-            {MEDIA_OPTIONS.map(({ type, label, icon, available }) => {
+            {MEDIA_OPTIONS.map(({ type, label, icon }) => {
               const isSelected = mediaType === type;
 
               return (
                 <Pressable
                   key={type}
                   onPress={() => setMediaType(type)}
-                  disabled={!available}
+                  disabled={saving}
                   style={({ pressed }) => [
                     styles.mediaChip,
                     isSelected ? styles.mediaChipSelected : styles.mediaChipIdle,
-                    !available && styles.mediaChipDisabled,
                     pressed && styles.pressed,
                   ]}
                   accessibilityRole="button"
-                  accessibilityState={{ selected: isSelected, disabled: !available }}
-                  accessibilityLabel={
-                    available ? `Formato ${label}` : `Formato ${label}, todavía no disponible`
-                  }
+                  accessibilityState={{ selected: isSelected }}
+                  accessibilityLabel={`Formato ${label}`}
                 >
                   <Ionicons
                     name={icon}
@@ -298,9 +314,10 @@ export const CreateMemoryScreen: React.FC<CreateMemoryScreenProps> = ({
               );
             })}
           </View>
-
-          <Text style={styles.mediaHint}>Video y audio llegan más adelante.</Text>
         </View>
+
+        {mediaType === 'video' ? <VideoComposer value={video} onChange={setVideo} /> : null}
+        {mediaType === 'audio' ? <AudioComposer value={audio} onChange={setAudio} /> : null}
 
         {/* Medium: the real photo that will be uploaded */}
         {mediaType === 'image' ? (
@@ -630,9 +647,6 @@ const styles = StyleSheet.create({
     transform: [{ scale: 1.02 }],
     ...SHADOWS.soft,
   },
-  mediaChipDisabled: {
-    opacity: 0.35,
-  },
   mediaChipLabel: {
     fontFamily: FONTS.sans,
     fontSize: 10,
@@ -645,13 +659,6 @@ const styles = StyleSheet.create({
   },
   mediaChipLabelIdle: {
     color: INK_WASH.medium,
-  },
-  mediaHint: {
-    marginTop: 6,
-    fontFamily: FONTS.sans,
-    fontSize: 10,
-    lineHeight: 14,
-    color: INK_WASH.faint,
   },
   mediaActions: {
     flexDirection: 'row',
@@ -725,7 +732,7 @@ const styles = StyleSheet.create({
     color: COLORS.ink,
   },
 
-  /* Image / video preview */
+  /* Image preview */
   mediaCard: {
     backgroundColor: COLORS.parchment,
     borderRadius: RADIUS.xl,
@@ -747,21 +754,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: alpha(COLORS.ink, 0.05),
   },
-  videoBadge: {
-    position: 'absolute',
-    right: 12,
-    bottom: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.navy,
-  },
-  videoBadgeText: {
-    fontFamily: FONTS.sans,
-    fontSize: 10,
-    fontWeight: '600',
-    color: COLORS.parchment,
-  },
   previewCaption: {
     fontFamily: FONTS.sans,
     fontSize: 10,
@@ -771,41 +763,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 
-  /* Audio preview */
-  audioCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 14,
-    padding: 16,
-    backgroundColor: COLORS.parchment,
-    borderRadius: RADIUS.xl,
-    ...SHADOWS.card,
-  },
-  audioIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: RADIUS.md,
-    backgroundColor: COLORS.dock,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  audioCopy: {
-    flex: 1,
-  },
-  audioTitle: {
-    fontFamily: FONTS.serif,
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '600',
-    color: COLORS.ink,
-  },
-  audioMeta: {
-    marginTop: 2,
-    fontFamily: FONTS.mono,
-    fontSize: 10,
-    lineHeight: 14,
-    color: alpha(COLORS.ink, 0.5),
-  },
 
   /* Text-only callout */
   textCallout: {

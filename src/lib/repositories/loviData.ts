@@ -245,9 +245,12 @@ export async function fetchLoviData(profileId: string): Promise<LoviData> {
   }
 
   const mappedAlbums: Album[] = albums.map((album) => {
-    const cover = album.cover_memory_id
-      ? memoryById.get(album.cover_memory_id)
-      : memories.find((memory) => memory.album_id === album.id);
+    // Only a photo can be a cover image: a video or audio file would render as a blank frame.
+    const chosen = album.cover_memory_id ? memoryById.get(album.cover_memory_id) : undefined;
+    const cover =
+      chosen?.media_type === 'image'
+        ? chosen
+        : memories.find((memory) => memory.album_id === album.id && memory.media_type === 'image');
     return {
       id: album.id,
       petId: album.pet_id,

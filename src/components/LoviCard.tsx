@@ -5,6 +5,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import { alpha, COLORS, INK_WASH, RADIUS, SHADOWS, TEXT } from '../theme';
 import type { LoviMemory, Pet } from '../types';
 import { AspectImage } from './AspectImage';
+import { AudioMemory, VideoMemory } from './MemoryPlayers';
 import { Sticker } from './Sticker';
 
 interface LoviCardProps {
@@ -16,17 +17,6 @@ interface LoviCardProps {
   onOpenComments?: (memory: LoviMemory) => void;
   onLikeToggle?: (memory: LoviMemory) => void;
 }
-
-const AUDIO_BARS = [
-  { height: 12, color: alpha(COLORS.ink, 0.3) },
-  { height: 20, color: alpha(COLORS.ink, 0.6) },
-  { height: 8, color: alpha(COLORS.ink, 0.3) },
-  { height: 16, color: alpha(COLORS.ink, 0.8) },
-  { height: 24, color: COLORS.fucsia },
-  { height: 12, color: alpha(COLORS.ink, 0.5) },
-  { height: 20, color: alpha(COLORS.ink, 0.7) },
-  { height: 8, color: alpha(COLORS.ink, 0.3) },
-];
 
 /** Editorial scrapbook card: one memory, its author pet and its social actions. */
 export const LoviCard: React.FC<LoviCardProps> = ({
@@ -41,6 +31,11 @@ export const LoviCard: React.FC<LoviCardProps> = ({
   // The like lives in the memory row, hydrated once for the feed, so Home and the pet profile
   // agree without a refetch. The card only renders it and asks for the change.
   const liked = memory.isLiked;
+  // Players stream from a URL; a bundled mock asset (a number) has nothing to play.
+  const mediaUri =
+    memory.mediaUrl && typeof memory.mediaUrl === 'object' && 'uri' in memory.mediaUrl
+      ? memory.mediaUrl.uri
+      : undefined;
   // The count is a suffix, so the zero case renders exactly the label it always did.
   const likesCount = memory.likesCount;
   const likesCountSuffix = likesCount > 0 ? ` · ${likesCount}` : null;
@@ -130,43 +125,15 @@ export const LoviCard: React.FC<LoviCardProps> = ({
         />
       ) : null}
 
-      {memory.mediaType === 'video' && memory.mediaUrl ? (
-        <AspectImage
-          source={memory.mediaUrl}
-          ratio={4 / 3}
-          style={styles.mediaFrame}
-          accessibilityLabel={memory.title}
-        >
-          <View style={styles.videoOverlay}>
-            <View style={styles.playButton}>
-              <Ionicons name="play" size={20} color={COLORS.ink} style={styles.playIcon} />
-            </View>
-          </View>
-          <View style={styles.durationBadge}>
-            <Text style={styles.durationText}>Video · {memory.videoDuration || '0:45'}</Text>
-          </View>
-        </AspectImage>
+      {memory.mediaType === 'video' && mediaUri ? (
+        <View style={styles.mediaSpacing}>
+          <VideoMemory uri={mediaUri} durationLabel={memory.videoDuration} title={memory.title} />
+        </View>
       ) : null}
 
-      {memory.mediaType === 'audio' ? (
-        <View style={styles.audioFrame}>
-          <View style={styles.audioLeft}>
-            <View style={styles.audioButton}>
-              <Ionicons name="volume-high" size={20} color={COLORS.butter} />
-            </View>
-            <View>
-              <Text style={styles.audioTitle}>Nota de audio de {pet.name}</Text>
-              <View style={styles.waveform}>
-                {AUDIO_BARS.map((bar, index) => (
-                  <View
-                    key={`bar-${index}`}
-                    style={[styles.waveBar, { height: bar.height, backgroundColor: bar.color }]}
-                  />
-                ))}
-              </View>
-            </View>
-          </View>
-          <Text style={styles.audioDuration}>{memory.audioDuration || '0:30'}</Text>
+      {memory.mediaType === 'audio' && mediaUri ? (
+        <View style={styles.mediaSpacing}>
+          <AudioMemory uri={mediaUri} durationLabel={memory.audioDuration} petName={pet.name} />
         </View>
       ) : null}
 
@@ -405,96 +372,14 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: INK_WASH.soft,
   },
+  mediaSpacing: {
+    marginBottom: 14,
+  },
   mediaFrame: {
     borderRadius: RADIUS.md,
     overflow: 'hidden',
     backgroundColor: alpha(COLORS.ink, 0.05),
     marginBottom: 14,
-  },
-  videoOverlay: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(0,0,0,0.2)',
-  },
-  playButton: {
-    width: 52,
-    height: 52,
-    borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.parchment,
-    alignItems: 'center',
-    justifyContent: 'center',
-    ...SHADOWS.soft,
-  },
-  playIcon: {
-    marginLeft: 2,
-  },
-  durationBadge: {
-    position: 'absolute',
-    right: 12,
-    bottom: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.navy,
-  },
-  durationText: {
-    fontFamily: TEXT.eyebrow.fontFamily,
-    fontSize: 9,
-    letterSpacing: 1,
-    textTransform: 'uppercase',
-    fontWeight: '600',
-    color: COLORS.parchment,
-  },
-  audioFrame: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-    padding: 14,
-    borderRadius: RADIUS.md,
-    backgroundColor: COLORS.cream,
-    marginBottom: 14,
-  },
-  audioLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flexShrink: 1,
-  },
-  audioButton: {
-    width: 44,
-    height: 44,
-    borderRadius: RADIUS.pill,
-    backgroundColor: COLORS.dock,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  audioTitle: {
-    fontFamily: TEXT.small.fontFamily,
-    fontSize: 11,
-    fontWeight: '600',
-    color: COLORS.ink,
-  },
-  waveform: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    marginTop: 6,
-  },
-  waveBar: {
-    width: 3,
-    borderRadius: RADIUS.pill,
-  },
-  audioDuration: {
-    fontFamily: TEXT.small.fontFamily,
-    fontSize: 11,
-    fontWeight: '600',
-    color: INK_WASH.soft,
   },
   quoteFrame: {
     padding: 20,
