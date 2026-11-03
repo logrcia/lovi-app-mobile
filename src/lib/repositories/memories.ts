@@ -1,7 +1,6 @@
-import { File } from 'expo-file-system';
-
 import type { MediaType } from '../../types';
 import { supabase } from '../db/client';
+import { readLocalAssetBytes } from '../media/readAssetBytes';
 
 export interface NewMemoryDraft {
   petId: string;
@@ -66,9 +65,9 @@ export async function createMemory(draft: NewMemoryDraft): Promise<string> {
   // Expo's fetch rejects `{ uri }` FormData parts, so the bytes are read directly.
   let bytes: ArrayBuffer;
   try {
-    bytes = await new File(draft.mediaLocalUri).arrayBuffer();
+    bytes = await readLocalAssetBytes(draft.mediaLocalUri);
   } catch {
-    throw new Error('No pudimos leer la foto de tu celular. Probá con otra.');
+    throw new Error('No pudimos leer la foto. Probá con otra.');
   }
 
   const { error: uploadError } = await supabase.storage

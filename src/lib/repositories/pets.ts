@@ -1,8 +1,7 @@
-import { File } from 'expo-file-system';
-
 import type { Pet } from '../../types';
 import { supabase } from '../db/client';
 import { SPECIES_DB } from '../labels';
+import { readLocalAssetBytes } from '../media/readAssetBytes';
 
 export interface PetAvatarSource {
   /** Local `file://` uri returned by the image picker. */
@@ -91,13 +90,13 @@ async function attachPetAvatar(petId: string, avatar: PetAvatarSource): Promise<
   const path = `${petId}/avatar.${extension}`;
 
   // Expo SDK 58 replaced the global fetch, and its FormData rejects `{ uri }` parts
-  // ("Unsupported FormDataPart implementation"). Read the real bytes instead: `File`
+  // ("Unsupported FormDataPart implementation"). Read the real bytes instead: the helper
   // hands us an ArrayBuffer, which storage-js uploads verbatim.
   let bytes: ArrayBuffer;
   try {
-    bytes = await new File(avatar.uri).arrayBuffer();
+    bytes = await readLocalAssetBytes(avatar.uri);
   } catch {
-    throw new Error('No pudimos leer la foto de tu celular. Probá con otra.');
+    throw new Error('No pudimos leer la foto. Probá con otra.');
   }
 
   const { error: uploadError } = await supabase.storage
