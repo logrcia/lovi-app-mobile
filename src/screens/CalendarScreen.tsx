@@ -49,8 +49,42 @@ const MONTH_NAMES = [
 
 const WEEKDAY_LABELS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'] as const;
 
-/** The reference designs "today" as 22 October 2026 — the agenda mock is anchored to it. */
-const DESIGN_TODAY = { year: 2026, month: 9, day: 22 } as const;
+interface Today {
+  year: number;
+  /** Zero-based, like `Date.getMonth()`. */
+  month: number;
+  day: number;
+}
+
+const readToday = (): Today => {
+  const now = new Date();
+  return { year: now.getFullYear(), month: now.getMonth(), day: now.getDate() };
+};
+
+/**
+ * Today as the device sees it. Re-read on an interval so a session left open across midnight
+ * moves the highlight and the "go to today" target instead of freezing on the mount date.
+ */
+const useToday = (): Today => {
+  const [today, setToday] = React.useState(readToday);
+
+  React.useEffect(() => {
+    const refresh = () => {
+      const next = readToday();
+      setToday((previous) =>
+        previous.year === next.year && previous.month === next.month && previous.day === next.day
+          ? previous
+          : next
+      );
+    };
+
+    refresh();
+    const interval = setInterval(refresh, 60_000);
+    return () => clearInterval(interval);
+  }, []);
+
+  return today;
+};
 
 const CELL_HEIGHT = 42;
 const CELL_GAP = 6;
@@ -122,8 +156,12 @@ const buildWeeks = (year: number, month: number): (number | null)[][] => {
 };
 
 export const CalendarScreen: React.FC<CalendarScreenProps> = ({ pet, events }) => {
-  const [cursor, setCursor] = React.useState<MonthCursor>({ year: 2026, month: 9 });
-  const [selectedDay, setSelectedDay] = React.useState(22);
+  const today = useToday();
+  const [cursor, setCursor] = React.useState<MonthCursor>({
+    year: today.year,
+    month: today.month,
+  });
+  const [selectedDay, setSelectedDay] = React.useState(today.day);
 
   const monthName = MONTH_NAMES[cursor.month];
   const weeks = React.useMemo(
@@ -139,9 +177,9 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({ pet, events }) =
   const selectedEvents = getEventsForDay(selectedDay);
 
   const isSelectedToday =
-    cursor.year === DESIGN_TODAY.year &&
-    cursor.month === DESIGN_TODAY.month &&
-    selectedDay === DESIGN_TODAY.day;
+    cursor.year === today.year &&
+    cursor.month === today.month &&
+    selectedDay === today.day;
 
   const shiftMonth = (delta: number) => {
     const next = new Date(cursor.year, cursor.month + delta, 1);
@@ -154,8 +192,8 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({ pet, events }) =
   };
 
   const goToToday = () => {
-    setCursor({ year: DESIGN_TODAY.year, month: DESIGN_TODAY.month });
-    setSelectedDay(DESIGN_TODAY.day);
+    setCursor({ year: today.year, month: today.month });
+    setSelectedDay(today.day);
   };
 
   return (
@@ -229,9 +267,7 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({ pet, events }) =
                 const isFilled = hasTurno || hasVacuna;
                 const isSelected = selectedDay === day;
                 const isToday =
-                  cursor.year === DESIGN_TODAY.year &&
-                  cursor.month === DESIGN_TODAY.month &&
-                  day === DESIGN_TODAY.day;
+                  cursor.year === today.year && cursor.month === today.month && day === today.day;
 
                 return (
                   <View key={`day-${day}`} style={styles.daySlot}>
@@ -313,7 +349,7 @@ export const CalendarScreen: React.FC<CalendarScreenProps> = ({ pet, events }) =
               accessibilityRole="button"
               accessibilityLabel="Volver al día de hoy"
             >
-              <Text style={styles.todayLink}>Ir a Hoy ({DESIGN_TODAY.day})</Text>
+              <Text style={styles.todayLink}>Ir a Hoy ({today.day})</Text>
             </Pressable>
           ) : null}
         </View>
