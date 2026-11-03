@@ -16,6 +16,7 @@ import * as ImagePicker from 'expo-image-picker';
 
 import { AspectImage } from '../components/AspectImage';
 import { Sticker } from '../components/Sticker';
+import { normalizePickedImage } from '../lib/media/normalizeImage';
 import type { NewMemoryDraft } from '../lib/repositories/memories';
 import {
   alpha,
@@ -97,6 +98,23 @@ export const CreateMemoryScreen: React.FC<CreateMemoryScreenProps> = ({
   const trimmedTitle = title.trim();
   const canSave = trimmedTitle.length > 0 && !saving;
 
+  const acceptAsset = async (asset: ImagePicker.ImagePickerAsset | undefined) => {
+    if (!asset) return;
+
+    try {
+      const normalized = await normalizePickedImage({
+        uri: asset.uri,
+        mimeType: asset.mimeType ?? null,
+      });
+      setMedia(normalized);
+    } catch (unknownError) {
+      Alert.alert(
+        'No pudimos usar esa foto',
+        unknownError instanceof Error ? unknownError.message : 'Probá con otra.'
+      );
+    }
+  };
+
   const pickFromLibrary = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted) {
@@ -110,8 +128,7 @@ export const CreateMemoryScreen: React.FC<CreateMemoryScreenProps> = ({
     });
 
     if (result.canceled) return;
-    const asset = result.assets[0];
-    if (asset) setMedia({ uri: asset.uri, mimeType: asset.mimeType ?? null });
+    await acceptAsset(result.assets[0]);
   };
 
   const pickFromCamera = async () => {
@@ -127,8 +144,7 @@ export const CreateMemoryScreen: React.FC<CreateMemoryScreenProps> = ({
     });
 
     if (result.canceled) return;
-    const asset = result.assets[0];
-    if (asset) setMedia({ uri: asset.uri, mimeType: asset.mimeType ?? null });
+    await acceptAsset(result.assets[0]);
   };
 
   const handleSave = async () => {

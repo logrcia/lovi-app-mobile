@@ -11,6 +11,7 @@ import {
 import Ionicons from '@expo/vector-icons/Ionicons';
 import * as ImagePicker from 'expo-image-picker';
 
+import { normalizePickedImage } from '../lib/media/normalizeImage';
 import { parseAgeToBirthday } from '../lib/pets/age';
 import { alpha, COLORS, FONTS, INK_WASH, RADIUS, SHADOWS } from '../theme';
 import type { Pet } from '../types';
@@ -125,9 +126,20 @@ export const AddPetModal: React.FC<AddPetModalProps> = ({ isOpen, onClose, onSav
 
   const canSave = name.trim().length > 0 && !saving;
 
-  const acceptAsset = (asset: ImagePicker.ImagePickerAsset | undefined) => {
+  const acceptAsset = async (asset: ImagePicker.ImagePickerAsset | undefined) => {
     if (!asset) return;
-    setPhoto({ uri: asset.uri, mimeType: asset.mimeType ?? null });
+
+    try {
+      const normalized = await normalizePickedImage({
+        uri: asset.uri,
+        mimeType: asset.mimeType ?? null,
+      });
+      setPhoto(normalized);
+    } catch (unknownError) {
+      setErrorMessage(
+        unknownError instanceof Error ? unknownError.message : 'No pudimos usar esa foto.'
+      );
+    }
   };
 
   const pickFromLibrary = async () => {
@@ -147,7 +159,7 @@ export const AddPetModal: React.FC<AddPetModalProps> = ({ isOpen, onClose, onSav
     });
 
     if (result.canceled) return;
-    acceptAsset(result.assets[0]);
+    await acceptAsset(result.assets[0]);
   };
 
   const pickFromCamera = async () => {
@@ -167,7 +179,7 @@ export const AddPetModal: React.FC<AddPetModalProps> = ({ isOpen, onClose, onSav
     });
 
     if (result.canceled) return;
-    acceptAsset(result.assets[0]);
+    await acceptAsset(result.assets[0]);
   };
 
   const handleSubmit = async () => {
