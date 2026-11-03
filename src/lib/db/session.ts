@@ -13,3 +13,4 @@ export type DbMemoryLike = Database['public']['Tables']['memory_likes']['Row'];
 export type DbAlbum = Database['public']['Tables']['albums']['Row'];
 export type DbVaccine = Database['public']['Tables']['vaccines']['Row'];
 export type DbAppointment = Database['public']['Tables']['appointments']['Row'];
+export type DbNotification = Database['public']['Tables']['notifications']['Row'];

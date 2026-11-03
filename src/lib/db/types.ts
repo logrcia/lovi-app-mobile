@@ -260,6 +260,78 @@ export type Database = {
           },
         ]
       }
+      notifications: {
+        Row: {
+          actor_id: string
+          comment_id: string | null
+          created_at: string
+          id: string
+          memory_id: string | null
+          pet_id: string
+          read_at: string | null
+          recipient_id: string
+          type: Database["public"]["Enums"]["notification_type"]
+        }
+        Insert: {
+          actor_id: string
+          comment_id?: string | null
+          created_at?: string
+          id?: string
+          memory_id?: string | null
+          pet_id: string
+          read_at?: string | null
+          recipient_id: string
+          type: Database["public"]["Enums"]["notification_type"]
+        }
+        Update: {
+          actor_id?: string
+          comment_id?: string | null
+          created_at?: string
+          id?: string
+          memory_id?: string | null
+          pet_id?: string
+          read_at?: string | null
+          recipient_id?: string
+          type?: Database["public"]["Enums"]["notification_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_comment_id_fkey"
+            columns: ["comment_id"]
+            isOneToOne: false
+            referencedRelation: "memory_comments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_memory_id_fkey"
+            columns: ["memory_id"]
+            isOneToOne: false
+            referencedRelation: "memories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_pet_id_fkey"
+            columns: ["pet_id"]
+            isOneToOne: false
+            referencedRelation: "pets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       pet_follows: {
         Row: {
           created_at: string
@@ -422,6 +494,7 @@ export type Database = {
     Enums: {
       appointment_type: "vet" | "grooming" | "vaccination"
       media_type: "image" | "video" | "audio" | "text"
+      notification_type: "follow" | "like" | "comment"
       pet_species: "dog" | "cat" | "rabbit" | "bird" | "other"
     }
     CompositeTypes: {
@@ -555,6 +628,7 @@ export const Constants = {
     Enums: {
       appointment_type: ["vet", "grooming", "vaccination"],
       media_type: ["image", "video", "audio", "text"],
+      notification_type: ["follow", "like", "comment"],
       pet_species: ["dog", "cat", "rabbit", "bird", "other"],
     },
   },

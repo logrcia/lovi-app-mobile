@@ -1,8 +1,10 @@
 import React from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import type { ReactNode } from 'react';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { LoviCard } from '../components/LoviCard';
+import { NotificationBell } from '../components/NotificationBell';
 import { Sticker } from '../components/Sticker';
 import {
   alpha,
@@ -14,18 +16,19 @@ import {
   SHADOWS,
   TEXT,
 } from '../theme';
-import type { LoviImage, LoviMemory, Pet } from '../types';
+import type { LoviMemory, Pet } from '../types';
 
 interface HomeScreenProps {
   pets: Pet[];
   memories: LoviMemory[];
   /** Fallback identity for the greeting when the account has no pet yet. */
   currentUserName?: string;
-  currentUserAvatar?: LoviImage;
+  /** Badge on the bell; the signed-in profile's unread notifications. */
+  unreadNotifications: number;
   onSelectPet: (petId: string) => void;
   onFollowToggle: (petId: string) => void;
   onOpenCreate: () => void;
-  onOpenUserProfile: () => void;
+  onOpenNotifications: () => void;
   onDelete?: (memory: LoviMemory) => void;
   onOpenComments?: (memory: LoviMemory) => void;
   onLikeToggle?: (memory: LoviMemory) => void;
@@ -39,11 +42,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   pets,
   memories,
   currentUserName,
-  currentUserAvatar,
+  unreadNotifications,
   onSelectPet,
   onFollowToggle,
   onOpenCreate,
-  onOpenUserProfile,
+  onOpenNotifications,
   onDelete,
   onOpenComments,
   onLikeToggle,
@@ -52,10 +55,23 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   const owner = myPets[0]?.owner;
   const ownerFirstName = owner?.name.split(' ')[0] ?? currentUserName?.split(' ')[0] ?? 'Abril';
-  const ownerAvatar = owner?.avatar ?? currentUserAvatar;
+
+  /**
+   * The bell sits outside the scroll view, so it stays pinned to the top-right corner while the
+   * feed scrolls underneath it. The header keeps an empty slot of the same size so the greeting
+   * never runs under the button.
+   */
+  const withBell = (content: ReactNode) => (
+    <View style={styles.screen}>
+      {content}
+      <View style={styles.bellSlot} pointerEvents="box-none">
+        <NotificationBell unreadCount={unreadNotifications} onPress={onOpenNotifications} />
+      </View>
+    </View>
+  );
 
   if (memories.length === 0) {
-    return (
+    return withBell(
       <ScrollView
         style={styles.screen}
         contentContainerStyle={{
@@ -99,7 +115,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
     );
   }
 
-  return (
+  return withBell(
     <ScrollView
       style={styles.screen}
       contentContainerStyle={{
@@ -123,22 +139,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </Text>
           </View>
 
-          <Pressable
-            onPress={onOpenUserProfile}
-            style={({ pressed }) => [styles.userAvatarButton, pressed && styles.pressed]}
-            accessibilityRole="button"
-            accessibilityLabel={`Ver perfil de ${ownerFirstName}`}
-          >
-            {ownerAvatar ? (
-              <Image source={ownerAvatar} style={styles.userAvatar} />
-            ) : (
-              <View style={[styles.userAvatar, styles.userAvatarFallback]}>
-                <Text style={styles.userAvatarInitial}>
-                  {(ownerFirstName[0] ?? 'A').toUpperCase()}
-                </Text>
-              </View>
-            )}
-          </Pressable>
+          <View style={styles.bellPlaceholder} />
         </View>
 
         <Text style={styles.intro}>
@@ -230,6 +231,15 @@ const styles = StyleSheet.create({
   headerLeft: {
     flex: 1,
   },
+  bellPlaceholder: {
+    width: 48,
+    height: 48,
+  },
+  bellSlot: {
+    position: 'absolute',
+    top: 12,
+    right: SCREEN_PADDING,
+  },
   greeting: {
     ...TEXT.display,
     marginTop: 6,
@@ -237,31 +247,6 @@ const styles = StyleSheet.create({
   greetingName: {
     fontStyle: 'italic',
     color: COLORS.fucsia,
-  },
-  userAvatarButton: {
-    width: 48,
-    height: 48,
-    borderRadius: RADIUS.pill,
-    borderWidth: 2,
-    borderColor: COLORS.parchment,
-    backgroundColor: COLORS.parchment,
-    overflow: 'hidden',
-    flexShrink: 0,
-    ...SHADOWS.soft,
-  },
-  userAvatar: {
-    width: '100%',
-    height: '100%',
-  },
-  userAvatarFallback: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.butter,
-  },
-  userAvatarInitial: {
-    fontFamily: FONTS.serif,
-    fontSize: 20,
-    color: COLORS.ink,
   },
   intro: {
     ...TEXT.body,
