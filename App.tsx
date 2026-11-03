@@ -84,6 +84,13 @@ function parseVaccineDate(input: string): string | null {
   return parseDesignDate(trimmed);
 }
 
+/**
+ * How often Explore re-reads the database while it is the active tab. The full dataset is nine
+ * queries, so this is deliberately lazy: fast enough that a pet created on another account
+ * shows up on its own, slow enough not to hammer Postgres.
+ */
+const EXPLORE_REFRESH_MS = 30_000;
+
 function AppShell({ profileId }: { profileId: string }) {
   const insets = useSafeAreaInsets();
 
@@ -136,10 +143,24 @@ function AppShell({ profileId }: { profileId: string }) {
   }, [remote.status, remote.data]);
 
   useEffect(() => {
-    if (remote.status === 'error') {
+    if (remote.error) {
       console.warn('[lovi] No se pudo leer Supabase:', remote.error);
     }
-  }, [remote.status, remote.error]);
+  }, [remote.error]);
+
+  /**
+   * Explore is the discovery surface, so it cannot be a snapshot of whenever the app happened to
+   * load: a pet another owner creates has to appear while the screen is open. Refetching on entry
+   * makes that instant, and the interval keeps it current without a manual reload.
+   */
+  const refetchLoviData = remote.refetch;
+  useEffect(() => {
+    if (screen !== 'explore') return;
+
+    refetchLoviData();
+    const interval = setInterval(refetchLoviData, EXPLORE_REFRESH_MS);
+    return () => clearInterval(interval);
+  }, [screen, refetchLoviData]);
 
   const currentPet = useMemo(
     () => pets.find((pet) => pet.id === selectedPetId) ?? pets.find((pet) => pet.isMine),

@@ -30,11 +30,14 @@ export function useLoviData(profileId: string): LoviDataState {
       })
       .catch((error: unknown) => {
         if (cancelled) return;
-        setState({
-          status: 'error',
-          data: null,
-          error: error instanceof Error ? error.message : 'Error desconocido',
-        });
+        const message = error instanceof Error ? error.message : 'Error desconocido';
+        setState((previous) => ({
+          // A failed background refresh must not throw away the dataset already on screen:
+          // Explore polls this hook, and one transient blip would otherwise blank the feed.
+          status: previous.data ? 'ready' : 'error',
+          data: previous.data,
+          error: message,
+        }));
       });
 
     return () => {
