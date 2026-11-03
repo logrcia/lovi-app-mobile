@@ -566,7 +566,7 @@ const styles = StyleSheet.create({
     aspectRatio: 4 / 3,
     borderRadius: RADIUS.md,
     overflow: 'hidden',
-    backgroundColor: COLORS.navy,
+    backgroundColor: '#000',
   },
 
   /* Audio */
