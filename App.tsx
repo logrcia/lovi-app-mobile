@@ -139,7 +139,14 @@ function AppShell({ profileId }: { profileId: string }) {
     setVaccines(data.vaccines);
     setAppointments(data.appointments);
     setCalendarEvents(data.calendarEvents);
-    setViewedUser(data.currentUser);
+    // Every write refetches (following a pet, saving a memory…), so this runs while another
+    // owner's profile may be open. Only the first load and your own profile take the fresh row;
+    // anyone else's profile stays on screen.
+    setViewedUser((previous) =>
+      previous.id === CURRENT_USER.id || previous.id === data.currentUser.id
+        ? data.currentUser
+        : previous
+    );
     setSelectedPetId((previous) => {
       if (data.pets.some((pet) => pet.id === previous)) return previous;
       // Never default to a pet you do not own: those belong to Explore, not to "mine".
