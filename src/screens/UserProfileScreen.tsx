@@ -90,236 +90,242 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
   );
 
   return (
-    <ScrollView
-      style={styles.scroll}
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-    >
+    <>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
+
+        {onBack ? (
+          <Pressable
+            onPress={onBack}
+            style={({ pressed }) => [styles.backButton, pressed && styles.backButtonPressed]}
+            accessibilityRole="button"
+            accessibilityLabel="Volver"
+          >
+            <Ionicons name="chevron-back" size={14} color={alpha(COLORS.ink, 0.7)} />
+            <Text style={styles.backLabel}>Volver</Text>
+          </Pressable>
+        ) : null}
+
+        {/* Profile header */}
+        <View style={styles.header}>
+          <View style={styles.avatarWrap}>
+            <View style={styles.avatarRing}>
+              <Image source={user.avatar} style={styles.avatar} />
+            </View>
+            <View style={styles.ownerBadge}>
+              <Text style={styles.ownerBadgeText}>{isMe ? 'Dueña' : 'Dueño/a'}</Text>
+            </View>
+          </View>
+
+          <View style={styles.identity}>
+            <Text style={styles.name}>{user.name}</Text>
+            <Text style={styles.handle}>
+              {user.handle} · {user.location}
+            </Text>
+            <Text style={styles.bio}>{user.bio}</Text>
+          </View>
+        </View>
+
+        {/* Pets */}
+        <View style={styles.petsSection}>
+          <View style={styles.sectionHeader}>
+            <View style={styles.sectionHeaderText}>
+              <Text style={styles.sectionTitle}>{isMe ? 'Mis mascotas' : 'Sus mascotas'}</Text>
+              <Text style={styles.sectionSubtitle}>
+                {isMe
+                  ? 'Tocá una mascota para ver su diario, álbumes y cuidados'
+                  : `Mascotas que cuida ${user.name.split(' ')[0]} en Lovi`}
+              </Text>
+            </View>
+            {isMe ? (
+              <Pressable
+                onPress={onOpenAddPet}
+                style={({ pressed }) => [styles.addPetButton, pressed && styles.addPetButtonPressed]}
+                accessibilityRole="button"
+                accessibilityLabel="Agregar nueva mascota"
+              >
+                <Ionicons name="add" size={14} color={COLORS.butter} />
+                <Text style={styles.addPetLabel}>Nueva mascota</Text>
+              </Pressable>
+            ) : null}
+          </View>
+
+          <View style={styles.petList}>
+            {displayPets.length === 0 ? (
+              <View style={styles.emptyPets}>
+                <Text style={styles.emptyPetsTitle}>
+                  {isMe ? 'Todavía no sumaste ninguna' : 'Sin mascotas todavía'}
+                </Text>
+                <Text style={styles.emptyPetsCopy}>
+                  {isMe
+                    ? 'Usá «Nueva mascota» para arrancar su diario, su calendario y sus recuerdos.'
+                    : `${user.name.split(' ')[0]} todavía no sumó mascotas a Lovi.`}
+                </Text>
+              </View>
+            ) : null}
+
+            {displayPets.map((pet) => (
+              <Pressable
+                key={pet.id}
+                onPress={() => onSelectPet(pet.id)}
+                style={({ pressed }) => [styles.petCard, pressed && styles.petCardPressed]}
+                accessibilityRole="button"
+                accessibilityLabel={`Ver perfil de ${pet.name}`}
+              >
+                <View style={styles.petBody}>
+                  <View style={styles.petAvatarWrap}>
+                    <Image source={pet.avatar} style={styles.petAvatar} />
+                    <View style={styles.speciesSticker}>
+                      <Sticker
+                        variant="butter"
+                        rotation="none"
+                        style={styles.speciesStickerSurface}
+                        textStyle={styles.speciesStickerText}
+                      >
+                        {pet.species}
+                      </Sticker>
+                    </View>
+                  </View>
+
+                  <View style={styles.petDetails}>
+                    <View style={styles.petNameRow}>
+                      <Text style={styles.petName} numberOfLines={1}>
+                        {pet.name}
+                      </Text>
+                      <Text style={styles.petAge}>{pet.age}</Text>
+                    </View>
+
+                    <Text style={styles.petBio} numberOfLines={1}>
+                      {pet.bio}
+                    </Text>
+
+                    <View style={styles.petMetaRow}>
+                      <Text style={styles.petMetaText}>{pet.followersCount} seguidores</Text>
+                      {pet.isMine ? (
+                        <>
+                          <Text style={styles.petMetaText}>·</Text>
+                          <Text style={styles.mineLabel}>Tu mascota</Text>
+                        </>
+                      ) : (
+                        <>
+                          <Text style={styles.petMetaText}>·</Text>
+                          <Pressable
+                            onPress={() => onFollowToggle(pet.id)}
+                            style={({ pressed }) => [
+                              styles.followButton,
+                              pet.isFollowing ? styles.followingButton : styles.notFollowingButton,
+                              pressed && styles.followButtonPressed,
+                            ]}
+                            accessibilityRole="button"
+                            accessibilityLabel={`${pet.isFollowing ? 'Dejar de seguir' : 'Seguir'} a ${pet.name}`}
+                          >
+                            <Text
+                              style={[
+                                styles.followLabel,
+                                pet.isFollowing ? styles.followingLabel : styles.notFollowingLabel,
+                              ]}
+                            >
+                              {pet.isFollowing ? 'Siguiendo' : 'Seguir'}
+                            </Text>
+                          </Pressable>
+                        </>
+                      )}
+                    </View>
+                  </View>
+                </View>
+
+                <View style={styles.chevron}>
+                  <Ionicons name="chevron-forward" size={16} color={alpha(COLORS.ink, 0.6)} />
+                </View>
+              </Pressable>
+            ))}
+          </View>
+        </View>
+
+        {/* Who this profile follows */}
+        {isMe ? (
+          <Pressable
+            onPress={() => setIsFollowingOpen(true)}
+            style={({ pressed }) => [
+              styles.followingCard,
+              pressed && styles.followingCardPressed,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={`Ver las cuentas que seguís (${followingPets.length})`}
+          >
+            <View style={styles.followingIcon}>
+              <Ionicons name="heart" size={16} color={COLORS.fucsia} />
+            </View>
+
+            <View style={styles.followingCopy}>
+              <Text style={styles.followingTitle}>
+                {followingPets.length === 0
+                  ? 'No seguís a ninguna cuenta'
+                  : followingPets.length === 1
+                    ? 'Seguís a 1 cuenta'
+                    : `Seguís a ${followingPets.length} cuentas`}
+              </Text>
+              <Text style={styles.followingSubtitle}>Ver la lista de mascotas que seguís</Text>
+            </View>
+
+            <Ionicons name="chevron-forward" size={16} color={alpha(COLORS.ink, 0.6)} />
+          </Pressable>
+        ) : null}
+
+        {/* Account & preferences — only for the current user */}
+        {isMe ? (
+          <View style={styles.accountSection}>
+            <Text style={styles.accountTitle}>Cuenta y Preferencias</Text>
+
+            <View style={styles.accountCard}>
+              {PREFERENCES.map((row, index) => (
+                <Pressable
+                  key={row.id}
+                  style={({ pressed }) => [
+                    styles.accountRow,
+                    index > 0 && styles.accountRowDivider,
+                    pressed && styles.accountRowPressed,
+                  ]}
+                >
+                  <View style={styles.accountRowLeft}>
+                    <View style={[styles.accountIcon, { backgroundColor: row.background }]}>
+                      <Ionicons name={row.icon} size={16} color={row.iconColor} />
+                    </View>
+                    <Text style={styles.accountLabel}>{row.label}</Text>
+                  </View>
+                  <Text style={[styles.accountValue, { color: row.valueColor }]}>{row.value}</Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Pressable
+              onPress={onSignOut}
+              style={({ pressed }) => [styles.signOutButton, pressed && styles.accountRowPressed]}
+              accessibilityRole="button"
+              accessibilityLabel="Cerrar sesión"
+            >
+              <Ionicons name="log-out-outline" size={15} color={COLORS.fucsia} />
+              <Text style={styles.signOutLabel}>Cerrar sesión</Text>
+            </Pressable>
+
+            <Text style={styles.footer}>Lovi · {user.joinedDate}</Text>
+          </View>
+        ) : null}
+      </ScrollView>
+
+      {/* Outside the scroll view on purpose: on web the modal is an absolutely positioned layer,
+          and inside the scroll content it would pin to the bottom of the whole profile instead
+          of the screen. */}
       <FollowingModal
         visible={isFollowingOpen}
         onClose={() => setIsFollowingOpen(false)}
         pets={followingPets}
         onSelectPet={onSelectPet}
       />
-
-      {onBack ? (
-        <Pressable
-          onPress={onBack}
-          style={({ pressed }) => [styles.backButton, pressed && styles.backButtonPressed]}
-          accessibilityRole="button"
-          accessibilityLabel="Volver"
-        >
-          <Ionicons name="chevron-back" size={14} color={alpha(COLORS.ink, 0.7)} />
-          <Text style={styles.backLabel}>Volver</Text>
-        </Pressable>
-      ) : null}
-
-      {/* Profile header */}
-      <View style={styles.header}>
-        <View style={styles.avatarWrap}>
-          <View style={styles.avatarRing}>
-            <Image source={user.avatar} style={styles.avatar} />
-          </View>
-          <View style={styles.ownerBadge}>
-            <Text style={styles.ownerBadgeText}>{isMe ? 'Dueña' : 'Dueño/a'}</Text>
-          </View>
-        </View>
-
-        <View style={styles.identity}>
-          <Text style={styles.name}>{user.name}</Text>
-          <Text style={styles.handle}>
-            {user.handle} · {user.location}
-          </Text>
-          <Text style={styles.bio}>{user.bio}</Text>
-        </View>
-      </View>
-
-      {/* Pets */}
-      <View style={styles.petsSection}>
-        <View style={styles.sectionHeader}>
-          <View style={styles.sectionHeaderText}>
-            <Text style={styles.sectionTitle}>{isMe ? 'Mis mascotas' : 'Sus mascotas'}</Text>
-            <Text style={styles.sectionSubtitle}>
-              {isMe
-                ? 'Tocá una mascota para ver su diario, álbumes y cuidados'
-                : `Mascotas que cuida ${user.name.split(' ')[0]} en Lovi`}
-            </Text>
-          </View>
-          {isMe ? (
-            <Pressable
-              onPress={onOpenAddPet}
-              style={({ pressed }) => [styles.addPetButton, pressed && styles.addPetButtonPressed]}
-              accessibilityRole="button"
-              accessibilityLabel="Agregar nueva mascota"
-            >
-              <Ionicons name="add" size={14} color={COLORS.butter} />
-              <Text style={styles.addPetLabel}>Nueva mascota</Text>
-            </Pressable>
-          ) : null}
-        </View>
-
-        <View style={styles.petList}>
-          {displayPets.length === 0 ? (
-            <View style={styles.emptyPets}>
-              <Text style={styles.emptyPetsTitle}>
-                {isMe ? 'Todavía no sumaste ninguna' : 'Sin mascotas todavía'}
-              </Text>
-              <Text style={styles.emptyPetsCopy}>
-                {isMe
-                  ? 'Usá «Nueva mascota» para arrancar su diario, su calendario y sus recuerdos.'
-                  : `${user.name.split(' ')[0]} todavía no sumó mascotas a Lovi.`}
-              </Text>
-            </View>
-          ) : null}
-
-          {displayPets.map((pet) => (
-            <Pressable
-              key={pet.id}
-              onPress={() => onSelectPet(pet.id)}
-              style={({ pressed }) => [styles.petCard, pressed && styles.petCardPressed]}
-              accessibilityRole="button"
-              accessibilityLabel={`Ver perfil de ${pet.name}`}
-            >
-              <View style={styles.petBody}>
-                <View style={styles.petAvatarWrap}>
-                  <Image source={pet.avatar} style={styles.petAvatar} />
-                  <View style={styles.speciesSticker}>
-                    <Sticker
-                      variant="butter"
-                      rotation="none"
-                      style={styles.speciesStickerSurface}
-                      textStyle={styles.speciesStickerText}
-                    >
-                      {pet.species}
-                    </Sticker>
-                  </View>
-                </View>
-
-                <View style={styles.petDetails}>
-                  <View style={styles.petNameRow}>
-                    <Text style={styles.petName} numberOfLines={1}>
-                      {pet.name}
-                    </Text>
-                    <Text style={styles.petAge}>{pet.age}</Text>
-                  </View>
-
-                  <Text style={styles.petBio} numberOfLines={1}>
-                    {pet.bio}
-                  </Text>
-
-                  <View style={styles.petMetaRow}>
-                    <Text style={styles.petMetaText}>{pet.followersCount} seguidores</Text>
-                    {pet.isMine ? (
-                      <>
-                        <Text style={styles.petMetaText}>·</Text>
-                        <Text style={styles.mineLabel}>Tu mascota</Text>
-                      </>
-                    ) : (
-                      <>
-                        <Text style={styles.petMetaText}>·</Text>
-                        <Pressable
-                          onPress={() => onFollowToggle(pet.id)}
-                          style={({ pressed }) => [
-                            styles.followButton,
-                            pet.isFollowing ? styles.followingButton : styles.notFollowingButton,
-                            pressed && styles.followButtonPressed,
-                          ]}
-                          accessibilityRole="button"
-                          accessibilityLabel={`${pet.isFollowing ? 'Dejar de seguir' : 'Seguir'} a ${pet.name}`}
-                        >
-                          <Text
-                            style={[
-                              styles.followLabel,
-                              pet.isFollowing ? styles.followingLabel : styles.notFollowingLabel,
-                            ]}
-                          >
-                            {pet.isFollowing ? 'Siguiendo' : 'Seguir'}
-                          </Text>
-                        </Pressable>
-                      </>
-                    )}
-                  </View>
-                </View>
-              </View>
-
-              <View style={styles.chevron}>
-                <Ionicons name="chevron-forward" size={16} color={alpha(COLORS.ink, 0.6)} />
-              </View>
-            </Pressable>
-          ))}
-        </View>
-      </View>
-
-      {/* Who this profile follows */}
-      {isMe ? (
-        <Pressable
-          onPress={() => setIsFollowingOpen(true)}
-          style={({ pressed }) => [
-            styles.followingCard,
-            pressed && styles.followingCardPressed,
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel={`Ver las cuentas que seguís (${followingPets.length})`}
-        >
-          <View style={styles.followingIcon}>
-            <Ionicons name="heart" size={16} color={COLORS.fucsia} />
-          </View>
-
-          <View style={styles.followingCopy}>
-            <Text style={styles.followingTitle}>
-              {followingPets.length === 0
-                ? 'No seguís a ninguna cuenta'
-                : followingPets.length === 1
-                  ? 'Seguís a 1 cuenta'
-                  : `Seguís a ${followingPets.length} cuentas`}
-            </Text>
-            <Text style={styles.followingSubtitle}>Ver la lista de mascotas que seguís</Text>
-          </View>
-
-          <Ionicons name="chevron-forward" size={16} color={alpha(COLORS.ink, 0.6)} />
-        </Pressable>
-      ) : null}
-
-      {/* Account & preferences — only for the current user */}
-      {isMe ? (
-        <View style={styles.accountSection}>
-          <Text style={styles.accountTitle}>Cuenta y Preferencias</Text>
-
-          <View style={styles.accountCard}>
-            {PREFERENCES.map((row, index) => (
-              <Pressable
-                key={row.id}
-                style={({ pressed }) => [
-                  styles.accountRow,
-                  index > 0 && styles.accountRowDivider,
-                  pressed && styles.accountRowPressed,
-                ]}
-              >
-                <View style={styles.accountRowLeft}>
-                  <View style={[styles.accountIcon, { backgroundColor: row.background }]}>
-                    <Ionicons name={row.icon} size={16} color={row.iconColor} />
-                  </View>
-                  <Text style={styles.accountLabel}>{row.label}</Text>
-                </View>
-                <Text style={[styles.accountValue, { color: row.valueColor }]}>{row.value}</Text>
-              </Pressable>
-            ))}
-          </View>
-
-          <Pressable
-            onPress={onSignOut}
-            style={({ pressed }) => [styles.signOutButton, pressed && styles.accountRowPressed]}
-            accessibilityRole="button"
-            accessibilityLabel="Cerrar sesión"
-          >
-            <Ionicons name="log-out-outline" size={15} color={COLORS.fucsia} />
-            <Text style={styles.signOutLabel}>Cerrar sesión</Text>
-          </Pressable>
-
-          <Text style={styles.footer}>Lovi · {user.joinedDate}</Text>
-        </View>
-      ) : null}
-    </ScrollView>
+    </>
   );
 };
 

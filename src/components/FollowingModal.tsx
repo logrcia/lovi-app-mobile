@@ -32,6 +32,7 @@ export const FollowingModal: React.FC<FollowingModalProps> = ({
       title="Cuentas que seguís"
       description="Las mascotas cuyos recuerdos aparecen en tu feed"
       accent={COLORS.butter}
+      placement="center"
     >
       {pets.length === 0 ? (
         <View style={styles.empty}>
