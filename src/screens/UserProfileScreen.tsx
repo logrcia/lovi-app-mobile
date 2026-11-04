@@ -29,6 +29,8 @@ interface UserProfileScreenProps {
   onFollowToggle: (petId: string) => void;
   onSignOut: () => void;
   onBack?: () => void;
+  /** Shown only on your own profile, and only when you are listed in `ad_admins`. */
+  onOpenMonetization?: () => void;
 }
 
 interface PreferenceRow {
@@ -81,6 +83,7 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
   onFollowToggle,
   onSignOut,
   onBack,
+  onOpenMonetization,
 }) => {
   const [isFollowingOpen, setIsFollowingOpen] = React.useState(false);
 
@@ -275,6 +278,30 @@ export const UserProfileScreen: React.FC<UserProfileScreenProps> = ({
           </Pressable>
         ) : null}
 
+        {/* Monetization panel — admins only */}
+        {isMe && onOpenMonetization ? (
+          <Pressable
+            onPress={onOpenMonetization}
+            style={({ pressed }) => [
+              styles.followingCard,
+              pressed && styles.followingCardPressed,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Abrir el panel de monetización"
+          >
+            <View style={[styles.followingIcon, styles.monetizationIcon]}>
+              <Ionicons name="stats-chart" size={16} color={COLORS.ink} />
+            </View>
+
+            <View style={styles.followingCopy}>
+              <Text style={styles.followingTitle}>Panel de monetización (demo)</Text>
+              <Text style={styles.followingSubtitle}>Vistas, clics y ganancia estimada</Text>
+            </View>
+
+            <Ionicons name="chevron-forward" size={16} color={alpha(COLORS.ink, 0.6)} />
+          </Pressable>
+        ) : null}
+
         {/* Account & preferences — only for the current user */}
         {isMe ? (
           <View style={styles.accountSection}>
@@ -449,6 +476,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: alpha(COLORS.fucsia, 0.12),
+  },
+  monetizationIcon: {
+    backgroundColor: alpha(COLORS.butter, 0.6),
   },
   followingCopy: {
     flex: 1,

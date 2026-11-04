@@ -37,6 +37,16 @@
           "microphonePermission": "Lovi usa el micrófono para grabar notas de audio y el sonido de los videos de tus mascotas.",
           "enableBackgroundPlayback": false
         }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Lovi usa tu ubicación aproximada para mostrarte veterinarias y negocios para mascotas cerca tuyo.",
+          "locationAlwaysAndWhenInUsePermission": false,
+          "locationAlwaysPermission": false,
+          "isIosBackgroundLocationEnabled": false,
+          "isAndroidBackgroundLocationEnabled": false
+        }
       ]
     ]
   }

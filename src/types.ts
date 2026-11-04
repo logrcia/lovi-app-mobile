@@ -100,6 +100,11 @@ export interface CalendarEvent {
 export type MainTab = 'home' | 'explore' | 'calendar' | 'userProfile';
 
 /** Full navigation surface of the app shell. */
-export type ScreenType = MainTab | 'petProfile' | 'createMemory' | 'notifications';
+export type ScreenType =
+  | MainTab
+  | 'petProfile'
+  | 'createMemory'
+  | 'notifications'
+  | 'monetization';
 
 export type ScreenState = 'normal' | 'empty' | 'loading' | 'error';

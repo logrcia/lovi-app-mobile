@@ -5,6 +5,8 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 
 import { LoviCard } from '../components/LoviCard';
 import { NotificationBell } from '../components/NotificationBell';
+import { SponsoredCard } from '../components/SponsoredCard';
+import type { SponsoredAdsState } from '../lib/hooks/useSponsoredAds';
 import { Sticker } from '../components/Sticker';
 import {
   alpha,
@@ -29,6 +31,8 @@ interface HomeScreenProps {
   onFollowToggle: (petId: string) => void;
   onOpenCreate: () => void;
   onOpenNotifications: () => void;
+  /** Sponsored cards, slotted in after every `everyNPosts` memories. Omit to show none. */
+  ads?: SponsoredAdsState;
   onDelete?: (memory: LoviMemory) => void;
   onOpenComments?: (memory: LoviMemory) => void;
   onLikeToggle?: (memory: LoviMemory) => void;
@@ -47,6 +51,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onFollowToggle,
   onOpenCreate,
   onOpenNotifications,
+  ads,
   onDelete,
   onOpenComments,
   onLikeToggle,
@@ -183,20 +188,39 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
       {/* Vertical feed */}
       <View style={styles.feed}>
-        {memories.map((memory) => {
+        {memories.map((memory, index) => {
           const authorPet = pets.find((pet) => pet.id === memory.petId) ?? pets[0];
 
+          // After every N posts comes a sponsored slot; consecutive slots rotate through the
+          // nearby businesses so the same one does not repeat back to back.
+          const every = ads ? Math.max(1, ads.everyNPosts) : 0;
+          const slot = every > 0 && (index + 1) % every === 0 ? (index + 1) / every - 1 : -1;
+          const sponsored =
+            ads && slot >= 0 && ads.places.length > 0
+              ? ads.places[slot % ads.places.length]
+              : null;
+
           return (
-            <LoviCard
-              key={memory.id}
-              memory={memory}
-              pet={authorPet}
-              onPetClick={onSelectPet}
-              onFollowToggle={onFollowToggle}
-              onDelete={onDelete}
-              onOpenComments={onOpenComments}
-              onLikeToggle={onLikeToggle}
-            />
+            <React.Fragment key={memory.id}>
+              <LoviCard
+                memory={memory}
+                pet={authorPet}
+                onPetClick={onSelectPet}
+                onFollowToggle={onFollowToggle}
+                onDelete={onDelete}
+                onOpenComments={onOpenComments}
+                onLikeToggle={onLikeToggle}
+              />
+              {sponsored && ads ? (
+                <SponsoredCard
+                  place={sponsored}
+                  label={ads.label}
+                  userLocation={ads.userLocation}
+                  onImpression={ads.onImpression}
+                  onClick={ads.onClick}
+                />
+              ) : null}
+            </React.Fragment>
           );
         })}
       </View>
