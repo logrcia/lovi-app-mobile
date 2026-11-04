@@ -14,14 +14,17 @@ businesses when the search cannot run (see `ad_settings.use_demo_fallback`).
    npx supabase secrets set SERPAPI_KEY=<your-serpapi-key>
    ```
 
-3. Deploy the function:
+3. Deploy the function, either way:
+   - **From the browser:** Edge Functions → create a function named `nearby-ads`,
+     paste the whole of `index.ts` (the function is a single file on purpose) and deploy.
+   - **From a terminal** in the project folder (after `npx supabase login` and
+     `npx supabase link --project-ref <project-ref>`):
 
-   ```bash
-   npx supabase functions deploy nearby-ads
-   ```
+     ```bash
+     npx supabase functions deploy nearby-ads
+     ```
 
-   (`npx supabase login` and `npx supabase link --project-ref <project-ref>` first,
-   if this machine has not linked the project yet.)
+   The secret in step 2 can also be added from the browser, under Edge Functions → Secrets.
 
 4. Give the monetization panel to your accounts, in the SQL editor:
 
