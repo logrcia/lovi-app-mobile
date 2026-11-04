@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Image, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
 
@@ -33,6 +33,9 @@ export const SponsoredCard: React.FC<SponsoredCardProps> = ({
     onImpression(place);
   }, [place, onImpression]);
 
+  // Google photo links expire or get blocked; fall back to the paw tile instead of a blank square.
+  const [thumbFailed, setThumbFailed] = useState(false);
+
   const distance = userLocation
     ? formatDistance(distanceKm(userLocation, place))
     : null;
@@ -66,8 +69,12 @@ export const SponsoredCard: React.FC<SponsoredCardProps> = ({
         accessibilityRole="link"
         accessibilityLabel={`${label}: ${place.name}. Ver en el mapa`}
       >
-        {place.thumbnail ? (
-          <Image source={{ uri: place.thumbnail }} style={styles.thumb} />
+        {place.thumbnail && !thumbFailed ? (
+          <Image
+            source={{ uri: place.thumbnail }}
+            style={styles.thumb}
+            onError={() => setThumbFailed(true)}
+          />
         ) : (
           <View style={[styles.thumb, styles.thumbFallback]}>
             <Ionicons name="paw" size={26} color={COLORS.fucsia} />
