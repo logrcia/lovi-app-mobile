@@ -39,6 +39,109 @@ export type Database = {
   }
   public: {
     Tables: {
+      ad_admins: {
+        Row: {
+          created_at: string
+          profile_id: string
+        }
+        Insert: {
+          created_at?: string
+          profile_id: string
+        }
+        Update: {
+          created_at?: string
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ad_admins_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ad_events: {
+        Row: {
+          created_at: string
+          id: number
+          kind: Database["public"]["Enums"]["ad_event_kind"]
+          place_id: string
+          place_name: string
+          profile_id: string
+          zone_key: string
+        }
+        Insert: {
+          created_at?: string
+          id?: never
+          kind: Database["public"]["Enums"]["ad_event_kind"]
+          place_id: string
+          place_name: string
+          profile_id?: string
+          zone_key: string
+        }
+        Update: {
+          created_at?: string
+          id?: never
+          kind?: Database["public"]["Enums"]["ad_event_kind"]
+          place_id?: string
+          place_name?: string
+          profile_id?: string
+          zone_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ad_events_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ad_settings: {
+        Row: {
+          cache_ttl_hours: number
+          cpc_usd: number
+          cpm_usd: number
+          enabled: boolean
+          every_n_posts: number
+          id: number
+          label: string
+          max_results: number
+          search_query: string
+          updated_at: string
+          use_demo_fallback: boolean
+        }
+        Insert: {
+          cache_ttl_hours?: number
+          cpc_usd?: number
+          cpm_usd?: number
+          enabled?: boolean
+          every_n_posts?: number
+          id?: number
+          label?: string
+          max_results?: number
+          search_query?: string
+          updated_at?: string
+          use_demo_fallback?: boolean
+        }
+        Update: {
+          cache_ttl_hours?: number
+          cpc_usd?: number
+          cpm_usd?: number
+          enabled?: boolean
+          every_n_posts?: number
+          id?: number
+          label?: string
+          max_results?: number
+          search_query?: string
+          updated_at?: string
+          use_demo_fallback?: boolean
+        }
+        Relationships: []
+      }
       albums: {
         Row: {
           cover_memory_id: string | null
@@ -488,10 +591,22 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      ad_stats: {
+        Args: never
+        Returns: {
+          clicks: number
+          impressions: number
+          place_id: string
+          place_name: string
+          viewers: number
+        }[]
+      }
+      is_ad_admin: { Args: never; Returns: boolean }
       is_pet_owner: { Args: { target_pet_id: string }; Returns: boolean }
       path_pet_id: { Args: { object_name: string }; Returns: string }
     }
     Enums: {
+      ad_event_kind: "impression" | "click"
       appointment_type: "vet" | "grooming" | "vaccination"
       media_type: "image" | "video" | "audio" | "text"
       notification_type: "follow" | "like" | "comment"
@@ -626,6 +741,7 @@ export const Constants = {
   },
   public: {
     Enums: {
+      ad_event_kind: ["impression", "click"],
       appointment_type: ["vet", "grooming", "vaccination"],
       media_type: ["image", "video", "audio", "text"],
       notification_type: ["follow", "like", "comment"],

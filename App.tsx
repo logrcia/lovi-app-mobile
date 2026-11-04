@@ -20,7 +20,9 @@ import { signOut } from './src/lib/auth/actions';
 import { useSession } from './src/lib/auth/useSession';
 import { showMessage } from './src/lib/feedback';
 import { useLoviData } from './src/lib/hooks/useLoviData';
+import { useSponsoredAds } from './src/lib/hooks/useSponsoredAds';
 import { useUnreadNotifications } from './src/lib/hooks/useUnreadNotifications';
+import { isAdAdmin } from './src/lib/repositories/ads';
 import { createAlbum, setMemoryAlbum, type NewAlbumDraft } from './src/lib/repositories/albums';
 import { createAppointment, createVaccine } from './src/lib/repositories/care';
 import { setPetFollowing } from './src/lib/repositories/follows';
@@ -33,6 +35,7 @@ import { CalendarScreen } from './src/screens/CalendarScreen';
 import { CreateMemoryScreen } from './src/screens/CreateMemoryScreen';
 import { ExploreScreen } from './src/screens/ExploreScreen';
 import { HomeScreen } from './src/screens/HomeScreen';
+import { MonetizationScreen } from './src/screens/MonetizationScreen';
 import { NotificationsScreen } from './src/screens/NotificationsScreen';
 import { PetProfileScreen } from './src/screens/PetProfileScreen';
 import { UserProfileScreen } from './src/screens/UserProfileScreen';
@@ -122,6 +125,19 @@ function AppShell({ profileId }: { profileId: string }) {
   // swaps everything for what Postgres actually holds.
   const remote = useLoviData(profileId);
   const unread = useUnreadNotifications(profileId);
+  // Ads load the first time the feed is on screen, so the location prompt shows up in context.
+  const ads = useSponsoredAds(screen === 'home');
+  const [canSeeMonetization, setCanSeeMonetization] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void isAdAdmin().then((admin) => {
+      if (!cancelled) setCanSeeMonetization(admin);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [profileId]);
 
   /**
    * The signed-in profile. `CURRENT_USER` is only the pre-load placeholder for the first
@@ -207,12 +223,15 @@ function AppShell({ profileId }: { profileId: string }) {
     if (screen === 'createMemory') return null;
     // The inbox is opened from the feed's bell, so the feed stays lit.
     if (screen === 'notifications') return 'home';
+    // The panel is opened from your own profile.
+    if (screen === 'monetization') return 'userProfile';
     if (screen === 'petProfile') return petProfileReturn;
 
     if (screen === 'userProfile' && viewedUser.id !== currentUser.id) {
       if (userProfileReturn === 'petProfile') return petProfileReturn;
       if (userProfileReturn === 'createMemory') return null;
       if (userProfileReturn === 'notifications') return 'home';
+      if (userProfileReturn === 'monetization') return 'userProfile';
       return userProfileReturn;
     }
 
@@ -226,6 +245,8 @@ function AppShell({ profileId }: { profileId: string }) {
       // dock highlight and the back arrow both return there instead of guessing "Mi perfil".
       if (screen === 'notifications') {
         setPetProfileReturn('home');
+      } else if (screen === 'monetization') {
+        setPetProfileReturn('userProfile');
       } else if (screen !== 'petProfile' && screen !== 'createMemory') {
         setPetProfileReturn(screen);
       }
@@ -571,6 +592,7 @@ function AppShell({ profileId }: { profileId: string }) {
       onFollowToggle={handleFollowToggle}
       onOpenCreate={openCreateMemory}
       onOpenNotifications={openNotifications}
+      ads={ads}
       onDelete={handleRequestDelete}
       onOpenComments={handleOpenComments}
       onLikeToggle={handleToggleLike}
@@ -651,6 +673,16 @@ function AppShell({ profileId }: { profileId: string }) {
           />
         );
 
+      case 'monetization':
+        return (
+          <MonetizationScreen
+            onBack={() => {
+              setViewedUser(currentUser);
+              setScreen('userProfile');
+            }}
+          />
+        );
+
       case 'calendar':
         return <CalendarScreen pets={myPets} events={myCalendarEvents} />;
 
@@ -672,6 +704,9 @@ function AppShell({ profileId }: { profileId: string }) {
               viewedUser.id === currentUser.id
                 ? undefined
                 : () => setScreen(userProfileReturn)
+            }
+            onOpenMonetization={
+              canSeeMonetization ? () => setScreen('monetization') : undefined
             }
           />
         );
