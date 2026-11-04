@@ -7,6 +7,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import Ionicons from '@expo/vector-icons/Ionicons';
@@ -24,6 +25,11 @@ interface AppModalProps {
   accent?: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
+  /**
+   * `sheet` (default) slides up from the bottom edge. `center` floats a card in the middle of
+   * the screen, for short lists that would otherwise sit low, next to the dock.
+   */
+  placement?: 'sheet' | 'center';
 }
 
 /**
@@ -39,8 +45,13 @@ export const AppModal: React.FC<AppModalProps> = ({
   accent = COLORS.fucsia,
   children,
   footer,
+  placement = 'sheet',
 }) => {
   const insets = useSafeAreaInsets();
+  const centered = placement === 'center';
+  // The centered layer sizes to its content, so a percentage max height has nothing to resolve
+  // against and the card collapses. The window height is a definite bound.
+  const { height: windowHeight } = useWindowDimensions();
 
   const overlay = (
     <>
@@ -48,11 +59,17 @@ export const AppModal: React.FC<AppModalProps> = ({
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.keyboardLayer}
+        style={[styles.keyboardLayer, centered && styles.keyboardLayerCentered]}
         pointerEvents="box-none"
       >
-        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]}>
-          <View style={styles.handle} />
+        <View
+          style={
+            centered
+              ? [styles.sheet, styles.card, { maxHeight: Math.round(windowHeight * 0.75) }]
+              : [styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) }]
+          }
+        >
+          {centered ? null : <View style={styles.handle} />}
 
           <View style={styles.header}>
             <View style={styles.headerText}>
@@ -95,12 +112,16 @@ export const AppModal: React.FC<AppModalProps> = ({
   // frame set in App.tsx. Render the sheet inline on web so it stays inside the frame.
   if (Platform.OS === 'web') {
     if (!visible) return null;
-    return <View style={[styles.root, styles.webOverlay]}>{overlay}</View>;
+    return (
+      <View style={[styles.root, styles.webOverlay, centered && styles.rootCentered]}>
+        {overlay}
+      </View>
+    );
   }
 
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose} statusBarTranslucent>
-      <View style={styles.root}>{overlay}</View>
+      <View style={[styles.root, centered && styles.rootCentered]}>{overlay}</View>
     </Modal>
   );
 };
@@ -109,6 +130,9 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     justifyContent: 'flex-end',
+  },
+  rootCentered: {
+    justifyContent: 'center',
   },
   webOverlay: {
     position: 'absolute',
@@ -129,6 +153,10 @@ const styles = StyleSheet.create({
   keyboardLayer: {
     justifyContent: 'flex-end',
   },
+  keyboardLayerCentered: {
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+  },
   sheet: {
     backgroundColor: COLORS.parchment,
     borderTopLeftRadius: RADIUS.xxxl,
@@ -137,6 +165,11 @@ const styles = StyleSheet.create({
     paddingTop: 10,
     maxHeight: '90%',
     ...SHADOWS.dock,
+  },
+  card: {
+    borderRadius: RADIUS.xxxl,
+    paddingTop: 20,
+    paddingBottom: 16,
   },
   handle: {
     alignSelf: 'center',
